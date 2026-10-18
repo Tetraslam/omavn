@@ -3,13 +3,32 @@ title: Compatibility
 description: Games tested against their raw downloads.
 ---
 
-Every entry here was installed from the download exactly as the store delivers it, then launched.
+Every entry here was installed from the download exactly as the store delivers it, launched, and checked to reach its title screen. Free games come from [freem!](https://www.freem.ne.jp) and are re-run with `scripts/compat.sh` (see [Contributing](/docs/contributing#compatibility-sweep)).
+
+## Commercial
 
 | Game | Download shape | Engine | Runner | Status |
 | --- | --- | --- | --- | --- |
 | Dies irae (Amantes amentes / Acta est Fabula) | 3 zips, each wrapping one volume of an SFX split RAR | Malie | Proton + gamescope | plays, incl. video and subtitles |
 | Yumina the Ethereal | `Setup.zip` (NSIS) plus 3 `.dat` zips it unpacks | custom | Proton + gamescope | installs unattended, plays |
-| HimaNatsu: Of Churches, Sunflowers, and Long Summers | single zip | Ren'Py 8.5 | native | plays |
+| HimaNatsu: Of Churches, Sunflowers, and Long Summers | single zip | Ren'Py 8.5 | native + gamescope | plays |
+
+## Free games, by engine
+
+| Engine | Games | Status |
+| --- | --- | --- |
+| KiriKiri 2 / KiriKiri Z | 永遠と長閑, きらきら更紗 | title screen |
+| NScripter | 君がいた夏, Re:Bible | title screen |
+| TyranoScript | 宵の帰り支度 | title screen |
+| YU-RIS | 隣人, ため息いくつ | title screen |
+| LiveMaker | 和敬恋々茶屋, 死月妖花 | title screen (needs the Japanese locale, set automatically) |
+| Ren'Py 8 | 別れ話、失敗しました, 失恋→Restart, TEAD | title screen |
+| Artemis | 結-musubi-, Armchair Detective | title screen |
+
+## Known quirks
+
+- **Japanese games** get a Japanese locale automatically (detected from kana in file names or the exe's resource language). Without it, some engines fail to open files with Japanese names.
+- **gamescope and some games:** a few games occasionally crash gamescope at startup. When that happens omavn retries in a plain window and keeps that setting for the game.
 
 Your game not here? Try it, then tell us how it went:
 

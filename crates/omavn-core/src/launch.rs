@@ -20,9 +20,14 @@ pub struct Spec {
     /// Overrides argv[0]; Ren'Py finds its game from it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arg0: Option<PathBuf>,
+    #[serde(serialize_with = "lossy_strings")]
     pub args: Vec<OsString>,
     pub env: BTreeMap<String, String>,
     pub cwd: PathBuf,
+}
+
+fn lossy_strings<S: serde::Serializer>(args: &[OsString], s: S) -> Result<S::Ok, S::Error> {
+    s.collect_seq(args.iter().map(|a| a.to_string_lossy()))
 }
 
 impl Spec {
@@ -125,7 +130,10 @@ fn gamescope(inner: Spec) -> Result<Spec> {
             args.push(v.to_string().into());
         }
     }
-    for a in ["-f", "-S", "fit", "--"] {
+    // --force-composition: direct scanout skews software-rendered windows
+    // whose width isn't aligned (KiriKiri 2 at 964 px draws as diagonal
+    // stripes). Compositing every frame costs nothing for a VN.
+    for a in ["-f", "-S", "fit", "--force-composition", "--"] {
         args.push(a.into());
     }
     match inner.arg0 {

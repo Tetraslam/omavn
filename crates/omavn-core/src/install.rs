@@ -42,25 +42,22 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
         .unwrap_or_else(|| "game".into());
 
     let (id, files_rel) = match &payload {
-        Payload::Game { root, .. } => {
+        Payload::Game { root, engine } => {
             let entry = catalog::lookup(paths, root)?;
-            let base = opts.id.clone().or(entry.map(|e| e.id)).unwrap_or_else(|| {
-                let dir = root.file_name().map(|n| n.to_string_lossy().into_owned());
-                detect::slug(
-                    &dir.filter(|_| root != &staged.dir)
-                        .unwrap_or(source_name.clone()),
-                )
-            });
+            let base = opts
+                .id
+                .clone()
+                .or(entry.map(|e| e.id))
+                .unwrap_or_else(|| detect::guess_id(root, *engine, &source_name));
             let id = library::free_id(paths, &base);
             reporter.step(format!("installing to {}", paths.game(&id).display()));
             ingest::materialize(root, &paths.game(&id).join("files"))?;
             (id, PathBuf::from("files"))
         }
         Payload::Installer { exe, kind } => {
-            let base = opts
-                .id
-                .clone()
-                .unwrap_or_else(|| detect::slug(&source_name));
+            let base = opts.id.clone().unwrap_or_else(|| {
+                detect::guess_id(Path::new(&source_name), Engine::Unknown, &source_name)
+            });
             let id = library::free_id(paths, &base);
             let files_rel = run_installer(paths, &id, exe, *kind, reporter)?;
             (id, files_rel)
@@ -146,7 +143,7 @@ fn finish(
         .title
         .clone()
         .or(entry.as_ref().map(|e| e.title.clone()))
-        .unwrap_or_else(|| title_from(&files, id));
+        .unwrap_or_else(|| detect::guess_title(&files, engine, id));
 
     let mut game = Game {
         id: id.to_string(),
@@ -172,6 +169,18 @@ fn finish(
         last_played: None,
         playtime_secs: 0,
     };
+    if runner == Runner::Proton
+        && !game.env.contains_key("LANG")
+        && detect::is_japanese(&files, engine)
+    {
+        reporter.info(format!(
+            "Japanese game: running it with a Japanese locale (undo: omavn set {} locale)",
+            game.id
+        ));
+        for var in ["LANG", "LC_ALL"] {
+            game.env.insert(var.into(), JAPANESE_LOCALE.into());
+        }
+    }
     game.save(paths)?;
     let verbs = entry
         .as_ref()
@@ -192,13 +201,9 @@ fn finish(
     Ok(game)
 }
 
-fn title_from(files: &Path, id: &str) -> String {
-    files
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .filter(|n| n != "files")
-        .unwrap_or_else(|| id.replace('-', " "))
-}
+/// Wine takes its ANSI code page from this; Proton's container generates
+/// the locale, so the host doesn't need it.
+pub const JAPANESE_LOCALE: &str = "ja_JP.UTF-8";
 
 /// Create the game's Wine prefix now, so the first launch is instant. The
 /// very first prefix also makes umu download the Steam runtime.

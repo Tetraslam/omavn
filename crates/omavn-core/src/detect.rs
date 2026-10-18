@@ -61,6 +61,7 @@ pub enum Engine {
     RpgMaker,
     Tyrano,
     Electron,
+    LiveMaker,
     Unknown,
 }
 
@@ -81,6 +82,7 @@ impl Engine {
             Self::RpgMaker => "RPG Maker",
             Self::Tyrano => "TyranoScript",
             Self::Electron => "Electron/NW.js",
+            Self::LiveMaker => "LiveMaker",
             Self::Unknown => "unknown",
         }
     }
@@ -175,7 +177,8 @@ pub fn engine(root: &Path) -> Engine {
         Engine::Malie
     } else if has("scene.pck") || exe_prefix("siglusengine") {
         Engine::Siglus
-    } else if has_ext("xp3") {
+    } else if has_ext("xp3") || exe_contains(&files, b"TVP(KIRIKIRI)") {
+        // KiriKiri can also carry its data appended to the exe.
         Engine::Kirikiri
     } else if has("bgi.exe") || has("sysgrp.arc") {
         Engine::Bgi
@@ -183,8 +186,13 @@ pub fn engine(root: &Path) -> Engine {
         Engine::Nscripter
     } else if has_ext("pfs") {
         Engine::Artemis
-    } else if has_ext("ypf") {
+    } else if has_ext("ypf")
+        || has("yscfg.dat")
+        || list(&root.join("pac")).iter().any(|p| ext_is(p, "ypf"))
+    {
         Engine::Yuris
+    } else if has("live.dll") {
+        Engine::LiveMaker
     } else if has("cs2conf.dll") || (has_ext("int") && has("cs2.exe")) {
         Engine::CatSystem2
     } else if has_dir("gamedata")
@@ -208,6 +216,178 @@ pub fn engine(root: &Path) -> Engine {
     } else {
         Engine::Unknown
     }
+}
+
+/// Whether any top-level exe contains `needle` in its first 16 MiB.
+fn exe_contains(files: &[PathBuf], needle: &[u8]) -> bool {
+    files.iter().filter(|p| ext_is(p, "exe")).any(|exe| {
+        let mut buf = Vec::new();
+        File::open(exe)
+            .and_then(|f| f.take(16 << 20).read_to_end(&mut buf))
+            .is_ok()
+            && memchr::memmem::find(&buf, needle).is_some()
+    })
+}
+
+/// Whether file names under `root` contain kana, which means a Japanese
+/// game. Those usually need a Japanese locale: their text and paths are
+/// Shift-JIS, which other locales turn into mojibake or missing files.
+pub fn is_japanese(root: &Path, engine: Engine) -> bool {
+    let kana = |c: char| matches!(c, '\u{3040}'..='\u{30ff}' | '\u{ff66}'..='\u{ff9f}');
+    let kana_names = WalkDir::new(root)
+        .max_depth(3)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .any(|e| e.file_name().to_string_lossy().chars().any(kana));
+    // Kanji-only names don't tell Japanese from Chinese; the exe's own
+    // resources do (language 0x0411).
+    kana_names
+        || targets(root, engine)
+            .first()
+            .is_some_and(|t| resource_languages(&root.join(&t.exe)).contains(&0x0411))
+}
+
+/// Language ids of a PE file's resources.
+fn resource_languages(exe: &Path) -> Vec<u32> {
+    use pelite::resources::{Entry, Name};
+    let Ok(bytes) = fs::read(exe) else {
+        return Vec::new();
+    };
+    let Ok(pe) = pelite::PeFile::from_bytes(&bytes) else {
+        return Vec::new();
+    };
+    let Ok(res) = pe.resources() else {
+        return Vec::new();
+    };
+    let Ok(root) = res.root() else {
+        return Vec::new();
+    };
+    let mut langs = Vec::new();
+    // Resource trees go type -> name -> language.
+    for ty in root.entries() {
+        let Ok(Entry::Directory(names)) = ty.entry() else {
+            continue;
+        };
+        for name in names.entries() {
+            let Ok(Entry::Directory(langdir)) = name.entry() else {
+                continue;
+            };
+            for lang in langdir.entries() {
+                if let Ok(Name::Id(id)) = lang.name()
+                    && !langs.contains(&id)
+                {
+                    langs.push(id);
+                }
+            }
+        }
+    }
+    langs
+}
+
+/// Names that say nothing about the game.
+const GENERIC: &[&str] = &[
+    "data",
+    "game",
+    "games",
+    "files",
+    "bin",
+    "app",
+    "release",
+    "build",
+    "start",
+    "launcher",
+    "tyranoproject",
+    "nw",
+    "main",
+    "play",
+    "setup",
+];
+
+/// Drop platform and version noise from a slug: `teadv2-2-01-win` -> `teadv2`.
+fn trim_slug(slug: &str) -> String {
+    const NOISE: &[&str] = &[
+        "win", "w", "windows", "win32", "win64", "x64", "x86", "pc", "final", "freem", "full",
+        "ver", "v",
+    ];
+    let mut parts: Vec<&str> = slug.split('-').collect();
+    while parts.len() > 1 {
+        let last = parts[parts.len() - 1];
+        let version = last.trim_start_matches("ver").trim_start_matches('v');
+        if NOISE.contains(&last)
+            || (!version.is_empty() && version.bytes().all(|b| b.is_ascii_digit()))
+        {
+            parts.pop();
+        } else {
+            break;
+        }
+    }
+    parts.join("-")
+}
+
+/// A typable library id for a game without a catalog entry: the first
+/// ASCII, non-generic candidate among the folder, exe, and download names.
+pub fn guess_id(root: &Path, engine: Engine, download: &str) -> String {
+    let mut candidates: Vec<String> = Vec::new();
+    if let Some(dir) = root.file_name() {
+        candidates.push(dir.to_string_lossy().into_owned());
+    }
+    if let Some(t) = targets(root, engine).first() {
+        candidates.push(t.name.clone());
+    }
+    candidates.push(download.to_string());
+    let slugs: Vec<String> = candidates.iter().map(|c| trim_slug(&slug(c))).collect();
+    slugs
+        .iter()
+        .find(|s| s.is_ascii() && !GENERIC.contains(&s.as_str()))
+        .or_else(|| slugs.iter().find(|s| !GENERIC.contains(&s.as_str())))
+        .cloned()
+        .unwrap_or_else(|| "game".into())
+}
+
+/// A display title for a game without a catalog entry or VNDB match:
+/// Ren'Py's build name, the exe's product name, or the exe's own name.
+pub fn guess_title(root: &Path, engine: Engine, fallback: &str) -> String {
+    let renpy_name = fs::read_to_string(root.join("game/cache/build_info.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v["name"].as_str().map(str::to_owned));
+    let exe = targets(root, engine).into_iter().next();
+    let product = exe.as_ref().and_then(|t| product_name(&root.join(&t.exe)));
+    let stem = exe
+        .map(|t| t.name)
+        .filter(|n| !GENERIC.contains(&slug(n).as_str()));
+    renpy_name
+        .or(product)
+        .or(stem)
+        .unwrap_or_else(|| fallback.replace(['-', '_'], " "))
+}
+
+/// `ProductName` from an exe's version resource, unless it just names the engine.
+fn product_name(exe: &Path) -> Option<String> {
+    let bytes = fs::read(exe).ok()?;
+    let pe = pelite::PeFile::from_bytes(&bytes).ok()?;
+    let info = pe.resources().ok()?.version_info().ok()?;
+    let lang = *info.translation().first()?;
+    let name = info.value(lang, "ProductName")?.trim().to_string();
+    const ENGINES: &[&str] = &[
+        "kirikiri",
+        "tvp",
+        "ren'py",
+        "renpy",
+        "unity",
+        "electron",
+        "nw.js",
+        "livemaker",
+        "nscripter",
+        "yu-ris",
+        "artemis",
+        "siglus",
+        "tyrano",
+        "rpg maker",
+        "microsoft",
+    ];
+    let lower = name.to_lowercase();
+    (!name.is_empty() && !ENGINES.iter().any(|e| lower.contains(e))).then_some(name)
 }
 
 /// Fingerprint the installer framework of a Windows executable, if any.
@@ -447,6 +627,17 @@ mod tests {
         assert!(is_32bit_exe(&dir.join("x86.exe")));
         assert!(!is_32bit_exe(&dir.join("x64.exe")));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn trims_slugs() {
+        assert_eq!(trim_slug("teadv2-2-01-win"), "teadv2");
+        assert_eq!(
+            trim_slug("wakarebanashi-failed-freem-1-0-win"),
+            "wakarebanashi-failed"
+        );
+        assert_eq!(trim_slug("4gatsu-8ka-ver2-0-0-4"), "4gatsu-8ka");
+        assert_eq!(trim_slug("dies-irae"), "dies-irae");
     }
 
     #[test]

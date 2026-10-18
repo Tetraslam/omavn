@@ -32,72 +32,101 @@ pub fn run(paths: &Paths, ui: &Ui, json: bool, args: RunArgs) -> Result<ExitCode
         (_, true) => Some(Display::Gamescope),
         _ => None,
     };
-    let opts = launch::Options {
+    let mut opts = launch::Options {
         target,
         args,
         display,
     };
-    let spec = launch::game(paths, &game, &opts, ui)?;
+    let mut spec = launch::game(paths, &game, &opts, ui)?;
     ui.finish_progress();
     if print {
         ui.result(&spec, || ui.line(&shell_line(&spec)));
         return Ok(ExitCode::SUCCESS);
     }
-    let mut cmd = spec.command();
     let log = game.log_file(paths);
+    // Launched from a menu or launcher: there is no terminal to show
+    // progress, and Proton takes a few seconds to open a window.
+    let headless = !std::io::stdout().is_terminal() && !json;
+    if !detach {
+        if headless {
+            omavn_core::omarchy::notify(
+                &format!("Starting {}", game.title),
+                "",
+                Some(&omavn_core::art::cover(paths, &game)),
+                &[],
+                Some(5000),
+            );
+        } else if !verbose && !json {
+            ui.line(&format!("▶ {}", game.title));
+        }
+    }
+    game.last_played = Some(time_now());
+    let _ = game.save(paths);
+    loop {
+        let mut child = spawn(&spec, &log, verbose)?;
+        if detach {
+            ui.result(
+                &serde_json::json!({ "pid": child.id(), "log": log }),
+                || ui.success(&format!("started {} (pid {})", game.title, child.id())),
+            );
+            return Ok(ExitCode::SUCCESS);
+        }
+        let started = std::time::Instant::now();
+        let status = child.wait()?;
+        let quick_failure = !status.success() && started.elapsed().as_secs() < 15;
+        game.playtime_secs += started.elapsed().as_secs();
+        // gamescope doesn't get along with every game. When omavn chose it
+        // (rather than the user), try a plain window and remember that.
+        if quick_failure
+            && opts.display.is_none()
+            && game.display == Display::Auto
+            && in_gamescope(&spec)
+        {
+            ui.line(&format!(
+                "{} didn't start in gamescope; using a plain window from now on (undo: omavn set {} display auto)",
+                game.title, game.id
+            ));
+            game.display = Display::Window;
+            let _ = game.save(paths);
+            opts.display = Some(Display::Window);
+            spec = launch::game(paths, &game, &opts, ui)?;
+            continue;
+        }
+        let _ = game.save(paths);
+        if headless && quick_failure {
+            let log_s = log.display().to_string();
+            omavn_core::omarchy::notify(
+                &format!("{} didn't start", game.title),
+                &format!(
+                    "Click for the log. Report it with: omavn feedback --game {}",
+                    game.id
+                ),
+                None,
+                &["xdg-open", &log_s],
+                None,
+            );
+        }
+        if !status.success() && !verbose {
+            ui.line(&ui.dim(&format!("exited with {status}; log: {}", log.display())));
+        }
+        return Ok(exit_code(status));
+    }
+}
+
+fn spawn(spec: &launch::Spec, log: &std::path::Path, verbose: bool) -> Result<std::process::Child> {
+    let mut cmd = spec.command();
     if !verbose {
-        let file = std::fs::File::create(&log)?;
+        let file = std::fs::File::create(log)?;
         cmd.stdout(file.try_clone()?)
             .stderr(file)
             .stdin(std::process::Stdio::null());
     }
-    let mut child = cmd
-        .spawn()
-        .with_context(|| format!("starting {}", spec.program.display()))?;
-    game.last_played = Some(time_now());
-    let _ = game.save(paths);
-    if detach {
-        ui.result(
-            &serde_json::json!({ "pid": child.id(), "log": log }),
-            || ui.success(&format!("started {} (pid {})", game.title, child.id())),
-        );
-        return Ok(ExitCode::SUCCESS);
-    }
-    // Launched from a menu or launcher: there is no terminal to show
-    // progress, and Proton takes a few seconds to open a window.
-    let headless = !std::io::stdout().is_terminal() && !json;
-    if headless {
-        omavn_core::omarchy::notify(
-            &format!("Starting {}", game.title),
-            "",
-            Some(&omavn_core::art::cover(paths, &game)),
-            &[],
-            Some(5000),
-        );
-    } else if !verbose && !json {
-        ui.line(&format!("▶ {}", game.title));
-    }
-    let started = std::time::Instant::now();
-    let status = child.wait()?;
-    game.playtime_secs += started.elapsed().as_secs();
-    let _ = game.save(paths);
-    if headless && !status.success() && started.elapsed().as_secs() < 15 {
-        let log_s = log.display().to_string();
-        omavn_core::omarchy::notify(
-            &format!("{} didn't start", game.title),
-            &format!(
-                "Click for the log. Report it with: omavn feedback --game {}",
-                game.id
-            ),
-            None,
-            &["xdg-open", &log_s],
-            None,
-        );
-    }
-    if !status.success() && !verbose {
-        ui.line(&ui.dim(&format!("exited with {status}; log: {}", log.display())));
-    }
-    Ok(exit_code(status))
+    cmd.spawn()
+        .with_context(|| format!("starting {}", spec.program.display()))
+}
+
+fn in_gamescope(spec: &launch::Spec) -> bool {
+    spec.program.file_name().is_some_and(|n| n == "gamescope")
 }
 
 /// The graphical library: Omarchy's cover grid. Other desktops don't have

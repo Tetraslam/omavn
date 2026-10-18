@@ -192,7 +192,7 @@ fn apply_setting(game: &mut Game, key: &str, value: Option<&str>) -> Result<()> 
 /// `ja` -> `ja_JP.UTF-8`; full locale names pass through.
 fn normalize_locale(l: &str) -> String {
     match l {
-        "ja" => "ja_JP.UTF-8".into(),
+        "ja" => omavn_core::install::JAPANESE_LOCALE.into(),
         "zh" | "zh-cn" => "zh_CN.UTF-8".into(),
         "zh-tw" => "zh_TW.UTF-8".into(),
         "ko" => "ko_KR.UTF-8".into(),

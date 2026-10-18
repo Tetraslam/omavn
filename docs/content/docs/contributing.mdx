@@ -47,6 +47,16 @@ scripts/headless.sh stop
 
 For mouse input into a game running under gamescope, use `xdotool` on gamescope's own X display (read `DISPLAY` from the game process's environment) with coordinates in the game's native resolution. wayvnc plus `vncdo` also works for Wine games, but SDL games like Ren'Py ignore its virtual pointer.
 
+## Compatibility sweep
+
+`scripts/compat.sh` installs each download into a throwaway library, launches it in the invisible session, and reports whether it kept running and drew something:
+
+```bash
+scripts/compat.sh -o /tmp/sweep ~/Downloads/vn1.zip ~/Downloads/"Some Folder"
+```
+
+It writes `results.jsonl`, `results.md`, and `sheet.png`, a contact sheet of every screenshot. Look at the sheet: an error dialog also counts as drawing. Set `OMAVN_BIN` to test a development build.
+
 ## Releases
 
 Tagging `vX.Y.Z` on `master` builds x86_64 and aarch64 binaries and publishes a GitHub release, which `omavn self update` and the install script pick up.
