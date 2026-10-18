@@ -44,3 +44,7 @@ Full docs live in [`docs/`](docs/content/docs) (a [Fumadocs](https://fumadocs.de
 ## Feedback
 
 `omavn feedback "what happened"` opens a GitHub issue with your system details filled in. Reports of games that work are as welcome as broken ones.
+
+## License
+
+[Apache-2.0](LICENSE)
