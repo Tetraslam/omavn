@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
 use crate::library::{Game, Runner};
@@ -86,4 +87,47 @@ fn newest_file(dir: &Path) -> Option<SystemTime> {
         .filter(|e| e.file_type().is_file())
         .filter_map(|e| e.metadata().ok()?.modified().ok())
         .max()
+}
+
+/// Copy a save folder from a Windows install into the game's prefix. The
+/// path below `Users/<name>/` (e.g. `AppData/Roaming/light`) is mirrored
+/// under the prefix's user folder, which is where the game will look.
+pub fn import(paths: &Paths, game: &Game, src: &Path) -> Result<PathBuf> {
+    if game.runner == Runner::NativeRenpy {
+        bail!(
+            "{} runs natively; copy Ren'Py saves into ~/.renpy/<game> instead",
+            game.title
+        );
+    }
+    let src = fs::canonicalize(src).with_context(|| format!("{} not found", src.display()))?;
+    let parts: Vec<String> = src
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let users = parts
+        .iter()
+        .position(|p| p.eq_ignore_ascii_case("users"))
+        .filter(|i| i + 2 < parts.len())
+        .with_context(|| {
+            format!("expected a path inside a Windows Users folder, like .../Users/<name>/AppData/Roaming/<game>, got {}", src.display())
+        })?;
+    let mut dest = game.prefix(paths).join("drive_c/users/steamuser");
+    for p in &parts[users + 2..] {
+        dest.push(p);
+    }
+    copy_dir(&src, &dest)?;
+    Ok(dest)
+}
+
+fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
+    for entry in WalkDir::new(src) {
+        let entry = entry?;
+        let target = dest.join(entry.path().strip_prefix(src)?);
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&target)?;
+        } else {
+            fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
 }

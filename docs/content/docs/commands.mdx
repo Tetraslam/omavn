@@ -85,9 +85,12 @@ Deletes the game, its prefix, its saves (see `omavn saves` first), and its launc
 ```bash
 omavn saves <game>          # save folders, newest first
 omavn saves <game> --open   # open the newest in your file manager
+omavn saves <game> --import /mnt/windows/Users/me/AppData/Roaming/light
 ```
 
 Finds save data by what changed after install: the Wine prefix's AppData and Documents, `save` folders in the game, and `~/.renpy` for native Ren'Py games. Back these up before `omavn remove`.
+
+Coming from Windows? `--import` copies a save folder from your old Windows install (mounted drive, backup, USB stick) into the same place inside the game's prefix: everything after `Users/<name>/` is kept, so `AppData/Roaming/light` lands where Dies irae looks for it. Games' readmes usually say where their saves live.
 
 ## exec
 

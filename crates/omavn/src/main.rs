@@ -147,6 +147,9 @@ enum Cmd {
         /// Open the newest save folder in your file manager.
         #[arg(long)]
         open: bool,
+        /// Copy saves from Windows into the game, e.g. /mnt/c/Users/me/AppData/Roaming/light.
+        #[arg(long, value_name = "PATH")]
+        import: Option<PathBuf>,
     },
     /// Print shell completions, e.g. `omavn completions bash > ~/.local/share/bash-completion/completions/omavn`.
     Completions {
@@ -608,8 +611,15 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 ui.success(&format!("installed into {}", game.id))
             });
         }
-        Cmd::Saves { game, open } => {
+        Cmd::Saves { game, open, import } => {
             let game = library::find(&paths, &game)?;
+            if let Some(src) = import {
+                let dest = omavn_core::saves::import(&paths, &game, &src)?;
+                ui.result(&serde_json::json!({ "imported": dest }), || {
+                    ui.success(&format!("copied saves to {}", dest.display()))
+                });
+                return Ok(ExitCode::SUCCESS);
+            }
             let dirs = omavn_core::saves::find(&paths, &game);
             if open && let Some(d) = dirs.first() {
                 open_url(&d.display().to_string());
@@ -780,7 +790,7 @@ fn pick_download(pick: bool) -> Result<PathBuf> {
     let out = std::process::Command::new("omarchy-menu-file")
         .arg("Visual novel download")
         .arg(&root)
-        .arg("zip rar 7z exe 001 msi")
+        .arg("zip rar 7z exe 001 msi iso")
         .output()?;
     let picked = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
     if picked.as_os_str().is_empty() {
