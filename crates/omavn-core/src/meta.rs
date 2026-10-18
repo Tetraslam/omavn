@@ -76,7 +76,7 @@ pub fn write_library_entry() -> Result<()> {
     Ok(())
 }
 
-pub fn icon(paths: &Paths, game: &Game) -> PathBuf {
+pub fn icon_path(paths: &Paths, game: &Game) -> PathBuf {
     game.dir(paths).join("icon.png")
 }
 
@@ -84,13 +84,18 @@ pub fn icon(paths: &Paths, game: &Game) -> PathBuf {
 /// usually are.
 fn write_icon(paths: &Paths, game: &Game) {
     let Ok(cover) = image::open(art::cover(paths, game)) else {
+        if let Some(icon) = art::exe_icon(paths, game) {
+            let _ = icon
+                .resize(256, 256, FilterType::CatmullRom)
+                .save(icon_path(paths, game));
+        }
         return;
     };
     let side = cover.width().min(cover.height());
     let square = cover.crop_imm((cover.width() - side) / 2, 0, side, side);
     let _ = square
         .resize_exact(256, 256, FilterType::CatmullRom)
-        .save(icon(paths, game));
+        .save(icon_path(paths, game));
 }
 
 fn applications_dir() -> Option<PathBuf> {
@@ -109,7 +114,7 @@ fn write_desktop_entry(paths: &Paths, game: &Game) -> Result<()> {
         return Ok(());
     };
     let exe = std::env::current_exe()?;
-    let icon = icon(paths, game);
+    let icon = icon_path(paths, game);
     let icon = if icon.exists() {
         icon.display().to_string()
     } else {

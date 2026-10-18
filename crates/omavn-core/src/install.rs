@@ -226,6 +226,11 @@ fn run_installer(
     kind: InstallerKind,
     reporter: &dyn Reporter,
 ) -> Result<PathBuf> {
+    if !crate::desktop::has_display() {
+        bail!(
+            "this download is a Windows installer, which needs a graphical session; run omavn install from your desktop (not over SSH)"
+        );
+    }
     let dir = paths.game(id);
     let files = dir.join("files");
     fs::create_dir_all(&files)?;

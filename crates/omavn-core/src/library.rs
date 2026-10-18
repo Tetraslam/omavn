@@ -168,13 +168,21 @@ pub fn umu_id(id: &str) -> String {
     format!("umu-omavn_{}", id.replace('-', "_"))
 }
 
-/// A fresh id based on `base` that is not taken yet.
+/// A fresh id based on `base` that is not taken yet. Folders without a
+/// manifest are leftovers from interrupted installs and get cleared.
 pub fn free_id(paths: &Paths, base: &str) -> String {
-    if !paths.game(base).exists() {
+    let free = |id: &str| {
+        let dir = paths.game(id);
+        if dir.exists() && !dir.join(MANIFEST).exists() {
+            let _ = fs::remove_dir_all(&dir);
+        }
+        !dir.exists()
+    };
+    if free(base) {
         return base.to_string();
     }
     (2..)
         .map(|n| format!("{base}-{n}"))
-        .find(|id| !paths.game(id).exists())
+        .find(|id| free(id))
         .unwrap()
 }

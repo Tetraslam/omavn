@@ -29,6 +29,18 @@ pub fn card(paths: &Paths, game: &Game) -> PathBuf {
     game.dir(paths).join("card.jpg")
 }
 
+/// The icon embedded in the game's own exe, for games VNDB doesn't know.
+pub fn exe_icon(paths: &Paths, game: &Game) -> Option<DynamicImage> {
+    let target = game.target(None).ok()?;
+    let bytes = fs::read(game.files_dir(paths).join(&target.exe)).ok()?;
+    let pe = pelite::PeFile::from_bytes(&bytes).ok()?;
+    let resources = pe.resources().ok()?;
+    let (_, group) = resources.icons().filter_map(|r| r.ok()).next()?;
+    let mut ico = Vec::new();
+    group.write(&mut ico).ok()?;
+    image::load_from_memory_with_format(&ico, image::ImageFormat::Ico).ok()
+}
+
 /// Download whatever art `meta` has into the game's directory.
 pub fn fetch(paths: &Paths, game: &Game, meta: &Meta, reporter: &dyn Reporter) -> Result<()> {
     let wanted = [
@@ -50,7 +62,13 @@ pub fn fetch(paths: &Paths, game: &Game, meta: &Meta, reporter: &dyn Reporter) -
 pub fn render(paths: &Paths, game: &Game) -> Result<PathBuf> {
     let cover = open(&cover(paths, game));
     let shot = open(&screenshot(paths, game));
-    let card = compose(cover.as_ref(), shot.as_ref());
+    let card = match (&cover, &shot) {
+        (None, None) => match exe_icon(paths, game) {
+            Some(icon) => icon_card(&icon),
+            None => compose(None, None),
+        },
+        _ => compose(cover.as_ref(), shot.as_ref()),
+    };
     let out = card_path_tmp(paths, game);
     DynamicImage::ImageRgba8(card)
         .into_rgb8()
@@ -91,6 +109,22 @@ fn compose(cover: Option<&DynamicImage>, shot: Option<&DynamicImage>) -> RgbaIma
         drop_shadow(&mut card, x as i64, margin as i64, w, h);
         imageops::overlay(&mut card, &inset, x as i64, margin as i64);
     }
+    card
+}
+
+/// A card built from a small exe icon: its colors blurred into a backdrop,
+/// the icon itself centered and scaled up crisply.
+fn icon_card(icon: &DynamicImage) -> RgbaImage {
+    let mut card = backdrop(icon);
+    let side = CARD_H / 3;
+    let filter = if icon.width() * 2 <= side {
+        FilterType::Nearest
+    } else {
+        FilterType::CatmullRom
+    };
+    let big = icon.resize(side, side, filter).to_rgba8();
+    let (x, y) = ((CARD_W - big.width()) / 2, (CARD_H - big.height()) / 2);
+    imageops::overlay(&mut card, &big, x as i64, y as i64);
     card
 }
 
