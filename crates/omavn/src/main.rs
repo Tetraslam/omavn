@@ -92,7 +92,7 @@ enum Cmd {
         #[arg(long, conflicts_with = "game")]
         all: bool,
     },
-    /// Change a game setting: display (auto|gamescope|window), target, title, env.NAME.
+    /// Change a game setting: display (auto|gamescope|window), target, title, locale (e.g. ja), env.NAME.
     ///
     /// Omit the value to reset it (for env.NAME, to remove the variable).
     Set {
@@ -758,6 +758,15 @@ fn set(game: &mut Game, key: &str, value: Option<&str>) -> Result<()> {
             game.default_target = v.to_string();
         }
         ("title", Some(v)) => game.title = v.to_string(),
+        // Untranslated Japanese games often need a Japanese locale (Shift-JIS text).
+        ("locale", v) => {
+            for var in ["LANG", "LC_ALL"] {
+                match v {
+                    Some(l) => game.env.insert(var.into(), normalize_locale(l)),
+                    None => game.env.remove(var),
+                };
+            }
+        }
         (k, v) if k.starts_with("env.") => {
             let name = &k[4..];
             match v {
@@ -766,9 +775,21 @@ fn set(game: &mut Game, key: &str, value: Option<&str>) -> Result<()> {
             };
         }
         (k, None) => bail!("`{k}` needs a value"),
-        (k, _) => bail!("unknown setting `{k}` (display, target, title, env.NAME)"),
+        (k, _) => bail!("unknown setting `{k}` (display, target, title, locale, env.NAME)"),
     }
     Ok(())
+}
+
+/// `ja` -> `ja_JP.UTF-8`; full locale names pass through.
+fn normalize_locale(l: &str) -> String {
+    match l {
+        "ja" => "ja_JP.UTF-8".into(),
+        "zh" | "zh-cn" => "zh_CN.UTF-8".into(),
+        "zh-tw" => "zh_TW.UTF-8".into(),
+        "ko" => "ko_KR.UTF-8".into(),
+        "en" => "en_US.UTF-8".into(),
+        other => other.into(),
+    }
 }
 
 #[derive(serde::Serialize)]

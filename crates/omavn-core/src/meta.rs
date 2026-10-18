@@ -43,7 +43,36 @@ pub fn refresh(
     art::render(paths, game)?;
     write_icon(paths, game);
     write_desktop_entry(paths, game)?;
+    write_library_entry()?;
     game.save(paths)?;
+    Ok(())
+}
+
+const ICON_SVG: &str = include_str!("../assets/omavn.svg");
+
+/// The "Visual Novels" app launcher entry that opens `omavn library`.
+pub fn write_library_entry() -> Result<()> {
+    let Some(apps) = applications_dir() else {
+        return Ok(());
+    };
+    let icons = apps.parent().unwrap().join("icons/hicolor/scalable/apps");
+    fs::create_dir_all(&icons)?;
+    fs::write(icons.join("omavn.svg"), ICON_SVG)?;
+    let exe = std::env::current_exe()?;
+    let entry = format!(
+        "[Desktop Entry]\n\
+         Type=Application\n\
+         Name=Visual Novels\n\
+         Comment=Your visual novel library\n\
+         Exec=\"{exe}\" library\n\
+         Icon=omavn\n\
+         Terminal=false\n\
+         Categories=Game;\n\
+         Keywords=visual novel;vn;omavn;library;\n",
+        exe = exe.display(),
+    );
+    fs::create_dir_all(&apps)?;
+    fs::write(apps.join("omavn.desktop"), entry)?;
     Ok(())
 }
 

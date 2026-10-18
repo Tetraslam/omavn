@@ -155,8 +155,13 @@ fn link(paths: &Paths, game: &Game, card: &Path) -> Result<()> {
     let dir = library_dir(paths);
     fs::create_dir_all(&dir)?;
     unlink(paths, game);
-    let name = format!("{}.jpg", game.title.replace('/', "∕"));
-    std::os::unix::fs::symlink(card, dir.join(name))?;
+    let title = game.title.replace('/', "∕");
+    // Two installs of the same title (say, two editions) both want the name.
+    let mut dest = dir.join(format!("{title}.jpg"));
+    if fs::symlink_metadata(&dest).is_ok() {
+        dest = dir.join(format!("{title} ({}).jpg", game.id));
+    }
+    std::os::unix::fs::symlink(card, dest)?;
     Ok(())
 }
 

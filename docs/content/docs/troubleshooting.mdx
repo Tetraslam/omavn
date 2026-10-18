@@ -23,12 +23,13 @@ omavn runs NSIS, Inno Setup, and MSI installers unattended. Other frameworks (In
 
 ## Japanese text is garbled
 
-Untranslated Japanese releases often need a Japanese locale. Add to the game's `game.toml`:
+Untranslated Japanese releases often expect a Japanese system locale (their text is Shift-JIS):
 
-```toml
-[env]
-LC_ALL = "ja_JP.UTF-8"
+```bash
+omavn set <game> locale ja
 ```
+
+The locale is generated inside Proton's container, so you don't need it installed on your system. Undo with `omavn set <game> locale`.
 
 ## Use a different Proton
 
