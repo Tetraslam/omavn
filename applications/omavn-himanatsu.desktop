@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=HimaNatsu: Of Churches, Sunflowers, and Long Summers
+Comment=Visual novel, played with omavn
+Exec="/home/tetraslam/Programming/omavn/target/release/omavn" run himanatsu
+Icon=/home/tetraslam/omavn-fresh-test/.local/share/omavn/games/himanatsu/icon.png
+Terminal=false
+Categories=Game;
+Keywords=visual novel;vn;omavn;
+X-Omavn-Id=himanatsu

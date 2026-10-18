@@ -233,19 +233,22 @@ fn run_installer(
     let win_target = format!("Z:{}", files.display()).replace('/', "\\");
 
     let mut args: Vec<OsString> = vec![exe.as_os_str().to_owned()];
-    match kind.silent_args(&win_target) {
-        Some(silent) => {
-            reporter.step(format!("running {kind:?} installer unattended (first run sets up Proton, this can take a minute)"));
-            args.extend(silent.into_iter().map(OsString::from));
-        }
-        None => {
-            reporter.step(format!(
-                "running {kind:?} installer; click through it, any install location works"
-            ));
-        }
+    let silent = kind.silent_args(&win_target);
+    if let Some(silent) = &silent {
+        args.extend(silent.iter().map(OsString::from));
     }
     let cwd = exe.parent().unwrap_or(Path::new("/")).to_path_buf();
+    // Fetches Proton and umu first if needed, so progress reads in order.
     let spec = launch::proton_spec(paths, &prefix, &library::umu_id(id), args, cwd, reporter)?;
+    if silent.is_some() {
+        reporter.step(format!(
+            "running {kind:?} installer unattended (the first one also sets up the Steam runtime)"
+        ));
+    } else {
+        reporter.step(format!(
+            "running {kind:?} installer; click through it, any install location works"
+        ));
+    }
     let started = time::OffsetDateTime::now_utc().unix_timestamp();
     let mut child = spec.command().spawn().context("starting umu-run")?;
     let status = loop {

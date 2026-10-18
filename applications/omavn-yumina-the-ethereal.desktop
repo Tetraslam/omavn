@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Yumina the Ethereal
+Comment=Visual novel, played with omavn
+Exec="/home/tetraslam/Programming/omavn/target/release/omavn" run yumina-the-ethereal
+Icon=/home/tetraslam/omavn-fresh-test/.local/share/omavn/games/yumina-the-ethereal/icon.png
+Terminal=false
+Categories=Game;
+Keywords=visual novel;vn;omavn;
+X-Omavn-Id=yumina-the-ethereal

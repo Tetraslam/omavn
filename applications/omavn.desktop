@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Visual Novels
+Comment=Your visual novel library
+Exec="/home/tetraslam/Programming/omavn/target/release/omavn" library
+Icon=omavn
+Terminal=false
+Categories=Game;
+Keywords=visual novel;vn;omavn;library;
