@@ -45,7 +45,7 @@ eval "$(scripts/headless.sh env)"   # point your shell at the session
 scripts/headless.sh stop
 ```
 
-For mouse input, attach `wayvnc` to the session and drive it with `vncdo`; focus the game window with `swaymsg` first.
+For mouse input into a game running under gamescope, use `xdotool` on gamescope's own X display (read `DISPLAY` from the game process's environment) with coordinates in the game's native resolution. wayvnc plus `vncdo` also works for Wine games, but SDL games like Ren'Py ignore its virtual pointer.
 
 ## Releases
 

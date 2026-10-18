@@ -55,7 +55,7 @@ pub fn game(paths: &Paths, game: &Game, opts: &Options, reporter: &dyn Reporter)
     let mut args: Vec<OsString> = target.args.iter().map(OsString::from).collect();
     args.extend(opts.args.iter().cloned());
 
-    let mut spec = match game.runner {
+    let spec = match game.runner {
         Runner::NativeRenpy => {
             let version = game
                 .renpy_version
@@ -76,19 +76,22 @@ pub fn game(paths: &Paths, game: &Game, opts: &Options, reporter: &dyn Reporter)
             let cwd = exe.parent().unwrap_or(&files).to_path_buf();
             let mut full = vec![exe.into_os_string()];
             full.extend(args);
-            let spec = proton_spec(
+            proton_spec(
                 paths,
                 &game.prefix(paths),
                 &game.umu_id(),
                 full,
                 cwd,
                 reporter,
-            )?;
-            match resolve_display(opts.display.unwrap_or(game.display)) {
-                Display::Gamescope => gamescope(spec)?,
-                _ => spec,
-            }
+            )?
         }
+    };
+    // Both runners: tiling window managers resize fixed-size game windows,
+    // which stretches Windows games and desyncs Ren'Py's drawing from its
+    // input. gamescope keeps the game at its own size and scales it.
+    let mut spec = match resolve_display(opts.display.unwrap_or(game.display)) {
+        Display::Gamescope => gamescope(spec)?,
+        _ => spec,
     };
     spec.env.extend(game.env.clone());
     Ok(spec)
@@ -125,7 +128,19 @@ fn gamescope(inner: Spec) -> Result<Spec> {
     for a in ["-f", "-S", "fit", "--"] {
         args.push(a.into());
     }
-    args.push(inner.program.into_os_string());
+    match inner.arg0 {
+        // gamescope execs its child with a plain argv; keep the override
+        // through bash's `exec -a`.
+        Some(arg0) => {
+            let bash = runtime::which("bash").context("bash is not installed")?;
+            args.push(bash.into_os_string());
+            args.push("-c".into());
+            args.push("exec -a \"$0\" \"$@\"".into());
+            args.push(arg0.into_os_string());
+            args.push(inner.program.into_os_string());
+        }
+        None => args.push(inner.program.into_os_string()),
+    }
     args.extend(inner.args);
     Ok(Spec {
         program,

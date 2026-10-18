@@ -39,7 +39,7 @@ Native Ren'Py runs faster, uses your real audio and GPU stack, and touches nothi
 
 Most VNs render at a fixed resolution (800x600, 1280x720) and read mouse positions in those pixels. When a tiling window manager resizes the window, the picture stretches but the game's idea of where you clicked does not, so buttons stop lining up with the cursor.
 
-With `display = "auto"` (the default), Proton games run inside a fullscreen [gamescope](https://github.com/ValveSoftware/gamescope) at your monitor's resolution: the game keeps its native size, gamescope scales it up with the aspect ratio intact, and maps the mouse to match. Without gamescope installed, games run in a plain window. Change it per game:
+With `display = "auto"` (the default), games run inside a fullscreen [gamescope](https://github.com/ValveSoftware/gamescope) at your monitor's resolution: the game keeps its native size, gamescope scales it up with the aspect ratio intact, and maps the mouse to match. This covers native Ren'Py games too: some (HimaNatsu, for one) render at a fixed size and stop lining up with the mouse when a tiling window manager resizes them. Without gamescope installed, games run in a plain window. Change it per game:
 
 ```bash
 omavn set <game> display window      # or gamescope, or auto

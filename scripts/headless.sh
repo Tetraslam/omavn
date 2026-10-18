@@ -11,7 +11,8 @@
 #   scripts/headless.sh stop             tear it down
 #
 # Set OMAVN_HEADLESS_GPU=/dev/dri/renderDXXX to pick the GPU and
-# OMAVN_HEADLESS_RES=WxH for the virtual output size.
+# OMAVN_HEADLESS_RES=WxH for the virtual output size and
+# OMAVN_HEADLESS_SCALE for fractional scaling (e.g. 1.6).
 set -euo pipefail
 
 STATE="${XDG_RUNTIME_DIR:-/tmp}/omavn-headless"
@@ -34,7 +35,7 @@ case "${1:-}" in
   start)
     if [[ -f "$STATE/pid" ]] && kill -0 "$(cat "$STATE/pid")" 2>/dev/null; then exit 0; fi
     cat >"$STATE/config" <<EOF
-output HEADLESS-1 resolution ${OMAVN_HEADLESS_RES:-1920x1080}
+output HEADLESS-1 resolution ${OMAVN_HEADLESS_RES:-1920x1080} scale ${OMAVN_HEADLESS_SCALE:-1}
 default_border none
 xwayland enable
 exec sh -c 'echo \$DISPLAY > $STATE/display; echo \$WAYLAND_DISPLAY > $STATE/wayland'
