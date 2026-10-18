@@ -3,6 +3,16 @@ title: Troubleshooting
 description: Common problems and fixes.
 ---
 
+## Clicks land in the wrong place, or the game looks stretched
+
+The game's window was resized (tiling window managers do this) while the game kept its own resolution. Install gamescope and omavn uses it automatically:
+
+```bash
+sudo pacman -S gamescope   # or your distro's package; on Omarchy: omavn omarchy setup
+```
+
+If gamescope misbehaves on your GPU, fall back to a floating window with `omavn set <game> display window` and make sure your window manager doesn't tile it.
+
 ## The game shows a settings dialog first
 
 Many VNs open a launcher or config dialog before the game, on Windows too. Pick your options and start the game; most have a "don't show again" box.

@@ -3,6 +3,18 @@ title: Installing omavn
 description: One binary, no system packages beyond python3.
 ---
 
+```bash
+curl -fsSL https://omavn.dev/install.sh | sh
+```
+
+Installs the latest release to `~/.local/bin/omavn` (x86_64 and aarch64 Linux). Update any time with:
+
+```bash
+omavn self update
+```
+
+On Omarchy, follow up with `omavn omarchy setup` ([details](/docs/omarchy)).
+
 ## From source
 
 Needs a Rust toolchain ([rustup.rs](https://rustup.rs)) and a C++ compiler (for the bundled unrar).
@@ -19,9 +31,10 @@ Nothing is installed system-wide. Everything lives in `~/.local/share/omavn`, an
 | --- | --- | --- |
 | GE-Proton | first Windows game | Steam's `compatibilitytools.d`, Steam's own Proton |
 | umu-launcher | first Windows game | `umu-run` on your `PATH` |
+| gamescope | never downloaded; install it with your package manager | `gamescope` on your `PATH` |
 | Ren'Py (Linux) | first Ren'Py game of that version | |
 
-You need `python3` (umu-launcher is a Python app) and a working GPU driver. `omavn doctor` checks both.
+You need `python3` (umu-launcher is a Python app), a working GPU driver including its 32-bit Vulkan libraries (most VNs are 32-bit), and ideally gamescope. `omavn doctor` checks them.
 
 ```bash
 omavn doctor
@@ -34,6 +47,8 @@ omavn doctor
 | `~/.local/share/omavn/games/<id>/files` | the game |
 | `~/.local/share/omavn/games/<id>/prefix` | its Wine prefix, including saves |
 | `~/.local/share/omavn/runtimes` | Proton, umu, Ren'Py |
+| `~/.local/share/omavn/library` | one card image per game, for launchers |
+| `~/.local/share/applications/omavn-<id>.desktop` | app launcher entries |
 | `~/.config/omavn/catalog` | your own [catalog entries](/docs/catalog) |
 
 Set `OMAVN_HOME` to keep everything under one directory instead.

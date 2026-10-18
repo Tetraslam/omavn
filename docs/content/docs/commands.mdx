@@ -6,25 +6,38 @@ description: Every omavn command. Add --json to any of them for machine-readable
 ## install
 
 ```bash
-omavn install <download> [--id ID] [--title TITLE] [--proton]
+omavn install <download> [--id ID] [--title TITLE] [--proton] [--offline]
+omavn install --pick
 ```
 
-Unpacks, installs, and registers a game. `<download>` can be a file or a folder. Alias: `add`.
+Unpacks, installs, and registers a game, then fetches its VNDB metadata and art. `<download>` can be a file or a folder. Alias: `add`.
 
 - `--id` sets the library id (default: from the catalog or the folder name)
 - `--proton` runs a Ren'Py game through Proton instead of natively
+- `--offline` skips VNDB and art
+- `--pick` chooses the download from a menu (Omarchy)
 
 ## run
 
 ```bash
-omavn run <game> [--target ID] [--detach] [--print] [-- args...]
+omavn run <game> [--target ID] [--window | --gamescope] [-v] [--detach] [--print] [-- args...]
 ```
 
-Launches a game. Alias: `play`.
+Launches a game. Alias: `play`. Ids, prefixes, and title fragments all work.
 
 - `--target` picks another entry point, like a different edition or a config tool (`omavn info` lists them)
+- `--window` / `--gamescope` override the display mode once (see [display](/docs/how-it-works#5-display))
+- `-v` shows Proton's output; otherwise it goes to the game's `last-run.log`
 - `--print` shows the exact command instead of running it
 - `--detach` returns right away
+
+## library
+
+```bash
+omavn library
+```
+
+Pick a game from your library and play it. On Omarchy this is a full-screen cover grid; elsewhere a numbered list. Alias: `pick`.
 
 ## list, info
 
@@ -35,13 +48,34 @@ omavn info <game>
 
 `info` shows the engine, runner, file and prefix paths, entry points, and notes.
 
+## set
+
+```bash
+omavn set <game> display window      # auto | gamescope | window
+omavn set <game> target amantes      # default entry point
+omavn set <game> title "Dies irae"
+omavn set <game> env.LC_ALL ja_JP.UTF-8
+omavn set <game> env.LC_ALL          # remove
+```
+
+## meta
+
+```bash
+omavn meta <game>             # refresh from VNDB
+omavn meta <game> --vndb v548 # wrong match? pin the right entry
+omavn meta --all
+```
+
+Refreshes metadata, art, the library card, and the app launcher entry.
+
 ## remove
 
 ```bash
 omavn remove <game> [--yes]
+omavn remove --pick
 ```
 
-Deletes the game, its prefix, and its saves. Asks first unless you pass `--yes`. Alias: `rm`.
+Deletes the game, its prefix, its saves, and its launcher entry. Asks first unless you pass `--yes`. Alias: `rm`.
 
 ## exec
 
@@ -60,6 +94,14 @@ omavn inspect <download>
 
 Reports what omavn would do (game or installer, engine, entry points) without installing.
 
+## omarchy
+
+```bash
+omavn omarchy setup | remove | status
+```
+
+See [Omarchy](/docs/omarchy).
+
 ## runtime
 
 ```bash
@@ -70,9 +112,18 @@ omavn runtime install renpy 8.5.2
 
 You rarely need this; runtimes are fetched when a game needs them. Set `OMAVN_PROTON` to a name from `runtime list` (or a path) to pin a Proton build.
 
+## self
+
+```bash
+omavn self update
+omavn self check
+```
+
+Updates omavn in place from the latest GitHub release (checksum verified).
+
 ## doctor
 
-Checks python3, display, Vulkan, disk space, and runtimes.
+Checks python3, display, Vulkan, gamescope, disk space, and runtimes.
 
 ## feedback
 

@@ -8,10 +8,10 @@ omavn takes whatever you downloaded (a zip, a stack of split rars, an installer,
 ## Install omavn
 
 ```bash
-cargo install --git https://github.com/Tetraslam/omavn omavn
+curl -fsSL https://omavn.dev/install.sh | sh
 ```
 
-Prebuilt binaries are coming. See [Installing omavn](/docs/installing) for details.
+On Omarchy, also run `omavn omarchy setup`. See [Installing omavn](/docs/installing) for details.
 
 ## Add a game
 
@@ -29,7 +29,7 @@ omavn install ~/Downloads/"Yumina the Ethereal" # Setup.zip plus yumina1-3.dat
 omavn run dies-irae
 ```
 
-Ids, prefixes, and title fragments all work: `omavn run dies`, `omavn run hima`.
+Ids, prefixes, and title fragments all work: `omavn run dies`, `omavn run hima`. Or browse everything with `omavn library`; each game also shows up in your app launcher.
 
 ## Something broke?
 
@@ -42,6 +42,7 @@ That opens a GitHub issue with your system details already filled in. See [Feedb
 <Cards>
   <Card title="Commands" href="/docs/commands" />
   <Card title="How it works" href="/docs/how-it-works" />
+  <Card title="Omarchy" href="/docs/omarchy" />
   <Card title="Compatibility" href="/docs/compatibility" />
   <Card title="For agents and scripts" href="/docs/agents" />
 </Cards>

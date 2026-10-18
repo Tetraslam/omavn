@@ -4,5 +4,9 @@ import type { ReactNode } from "react";
 import SearchDialog from "@/components/search";
 
 export function Provider({ children }: { children: ReactNode }) {
-  return <RootProvider search={{ SearchDialog }}>{children}</RootProvider>;
+  return (
+    <RootProvider search={{ SearchDialog }} theme={{ defaultTheme: "dark" }}>
+      {children}
+    </RootProvider>
+  );
 }

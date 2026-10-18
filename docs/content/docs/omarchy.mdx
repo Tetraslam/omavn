@@ -1,0 +1,45 @@
+---
+title: Omarchy
+description: Visual novels as a first-class part of your Omarchy desktop.
+---
+
+```bash
+omavn omarchy setup
+```
+
+That's it. Open the Omarchy menu and you'll find **Visual Novels**.
+
+## What you get
+
+- **Visual Novels in the menu.** Your library opens in the same full-screen cover grid as Omarchy's theme and wallpaper pickers. Type to filter, Enter to play.
+- **Install from the menu.** *Install → Gaming → Visual Novel* lets you pick a download from `~/Downloads`. A file inside a folder (like `Dies irae/MG1041_1.zip`) installs the whole folder, since multi-part downloads come that way.
+- **A notification when it's ready**, with the cover. Click it to play.
+- **Every game in the app launcher**, with an icon from its cover.
+- **Games look right.** Windows games run in gamescope, filling the screen with the right aspect and with clicks landing where you see the cursor. Hyprland rules keep them fully opaque (Omarchy's default window transparency is off for them) and stop the screen from idling while you read.
+- **Remove from the menu** too: *Remove → Visual Novel*.
+
+## What it changes
+
+Everything is marked and undoable:
+
+| Change | Where |
+| --- | --- |
+| installs `gamescope`, `umu-launcher`, and 32-bit GPU drivers | via `omarchy-pkg-add` and `omarchy-install-gaming-gpu-lib32` (asks for sudo) |
+| window rules | `~/.config/hypr/omavn.lua`, loaded by one `require("hypr.omavn")` line at the end of `~/.config/hypr/hyprland.lua` |
+| menu entries | three routes in `~/.config/omarchy/extensions/omarchy-menu.jsonc`; your existing entries and comments stay as they are |
+
+```bash
+omavn omarchy status    # what's set up
+omavn omarchy remove    # undo the rules and menu entries (packages stay)
+omavn omarchy setup --skip-packages   # no sudo
+```
+
+## Window rules
+
+Under gamescope every game window has the class `gamescope`. Games you switch to a plain window (`omavn set <game> display window`) get the class `steam_app_omavn_<id>`, so you can target one game in your own rules:
+
+```lua
+o.window({ class = "^steam_app_omavn_dies_irae$" }, { fullscreen = true })
+```
+
+Your own rules in `hyprland.lua` come before the omavn line, so for the same property omavn's wins. To override omavn, put your rule after `require("hypr.omavn")`.
