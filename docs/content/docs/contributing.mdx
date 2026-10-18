@@ -1,0 +1,52 @@
+---
+title: Contributing
+description: Add a game to the catalog, fix a bug, or build something on omavn.
+---
+
+The most useful contribution is a report: install a game, play a bit, and run
+
+```bash
+omavn feedback --kind game --game <id> "works perfectly"   # or what went wrong
+```
+
+## Add a catalog entry
+
+When a game needs something heuristics can't guess (a proper title, which exe is which edition, a VNDB id, environment variables), add `crates/omavn-core/catalog/<id>.toml`. The format is on the [Catalog](/docs/catalog) page. `cargo test` checks every entry parses and that the file name matches its id.
+
+## Work on omavn
+
+```bash
+git clone https://github.com/Tetraslam/omavn && cd omavn
+cargo test
+cargo run -- install ~/Downloads/some-vn.zip
+```
+
+Layout:
+
+| Path | What |
+| --- | --- |
+| `crates/omavn-core` | the library: unpacking, detection, installs, runtimes, launching, art, Omarchy |
+| `crates/omavn` | the CLI, a thin layer over the library |
+| `crates/omavn-core/catalog` | per-game knowledge |
+| `docs` | this site (Fumadocs) |
+| `scripts/headless.sh` | an invisible desktop for testing games |
+
+CI runs `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, and the docs lint and build. Run the same locally before opening a pull request.
+
+## Testing games without touching your desktop
+
+`scripts/headless.sh` starts an invisible sway session (GPU-backed, with Xwayland, audio routed to a null sink), so games can be launched, clicked, and screenshotted while you keep working:
+
+```bash
+scripts/headless.sh start
+scripts/headless.sh run omavn run dies-irae
+scripts/headless.sh shot /tmp/shot.png
+eval "$(scripts/headless.sh env)"   # point your shell at the session
+scripts/headless.sh stop
+```
+
+For mouse input, attach `wayvnc` to the session and drive it with `vncdo`; focus the game window with `swaymsg` first.
+
+## Releases
+
+Tagging `vX.Y.Z` on `master` builds x86_64 and aarch64 binaries and publishes a GitHub release, which `omavn self update` and the install script pick up.
