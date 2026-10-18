@@ -11,6 +11,7 @@ That's it. Open the Omarchy menu and you'll find **Visual Novels**.
 
 ## What you get
 
+- **Super + Shift + V** opens your library (skipped if you've bound that combo to something else).
 - **Visual Novels in the menu.** Your library opens in the same full-screen cover grid as Omarchy's theme and wallpaper pickers. Type to filter, Enter to play.
 - **Install from the menu.** *Install → Gaming → Visual Novel* lets you pick a download from `~/Downloads`. A file inside a folder (like `Dies irae/MG1041_1.zip`) installs the whole folder, since multi-part downloads come that way.
 - **A notification when it's ready**, with the cover. Click it to play.
@@ -25,7 +26,7 @@ Everything is marked and undoable:
 | Change | Where |
 | --- | --- |
 | installs `gamescope`, `umu-launcher`, and 32-bit GPU drivers | via `omarchy-pkg-add` and `omarchy-install-gaming-gpu-lib32` (asks for sudo) |
-| window rules | `~/.config/hypr/omavn.lua`, loaded by one `require("hypr.omavn")` line at the end of `~/.config/hypr/hyprland.lua` |
+| window rules and the keybinding | `~/.config/hypr/omavn.lua`, loaded by one `require("hypr.omavn")` line at the end of `~/.config/hypr/hyprland.lua` |
 | menu entries | three routes in `~/.config/omarchy/extensions/omarchy-menu.jsonc`; your existing entries and comments stay as they are |
 
 ```bash

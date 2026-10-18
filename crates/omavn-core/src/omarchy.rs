@@ -96,7 +96,15 @@ pub fn setup(omavn: &Path, skip_packages: bool) -> Result<Vec<String>> {
         }
     }
 
-    if write_if_changed(&hypr_rules(), &rules_lua())? {
+    let bind = if keybinding_free() {
+        Some(omavn)
+    } else {
+        changes.push(format!(
+            "skipped the {KEYS} keybinding: it's already in use"
+        ));
+        None
+    };
+    if write_if_changed(&hypr_rules(), &rules_lua(bind))? {
         changes.push(format!("wrote window rules to {}", hypr_rules().display()));
     }
     let main = hypr_main();
@@ -142,7 +150,35 @@ pub fn remove() -> Result<Vec<String>> {
     Ok(changes)
 }
 
-fn rules_lua() -> String {
+const KEYS: &str = "SUPER + SHIFT + V";
+
+/// Whether Super+Shift+V is unbound in the running Hyprland (or ours).
+fn keybinding_free() -> bool {
+    let Ok(out) = Command::new("hyprctl").args(["-j", "binds"]).output() else {
+        return true;
+    };
+    let Ok(binds) = serde_json::from_slice::<Vec<serde_json::Value>>(&out.stdout) else {
+        return true;
+    };
+    // modmask: SUPER = 64, SHIFT = 1.
+    !binds.iter().any(|b| {
+        b["modmask"] == 65
+            && b["key"]
+                .as_str()
+                .is_some_and(|k| k.eq_ignore_ascii_case("v"))
+            && !b["arg"].as_str().unwrap_or("").contains("omavn")
+    })
+}
+
+fn rules_lua(bind: Option<&Path>) -> String {
+    let bind = bind
+        .map(|exe| {
+            format!(
+                "\n-- Open your visual novel library.\no.bind(\"{KEYS}\", \"Visual novels\", o.launch(\"'{}' library\"))\n",
+                exe.display()
+            )
+        })
+        .unwrap_or_default();
     format!(
         r#"-- Written by `{MARK}`; undo with `omavn omarchy remove`.
 if not o then return end
@@ -164,7 +200,7 @@ o.window({{ class = "^steam_app_omavn_.*" }}, {{
   opacity = "1 1",
   idle_inhibit = "focus",
 }})
-"#
+{bind}"#
     )
 }
 
