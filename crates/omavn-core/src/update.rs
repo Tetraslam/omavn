@@ -28,15 +28,12 @@ pub fn asset_name() -> String {
 }
 
 pub fn check() -> Result<Available> {
-    let release = download::github_latest(REPO)?;
-    let latest = release.tag_name.trim_start_matches('v').to_string();
-    let asset = asset_name();
-    let url = release
-        .assets
-        .iter()
-        .find(|a| a.name == asset)
-        .map(|a| a.browser_download_url.clone())
-        .with_context(|| format!("release {} has no {asset}", release.tag_name))?;
+    let tag = download::github_latest_tag(REPO)?;
+    let latest = tag.trim_start_matches('v').to_string();
+    let url = format!(
+        "https://github.com/{REPO}/releases/download/{tag}/{}",
+        asset_name()
+    );
     Ok(Available {
         newer: is_newer(&latest, VERSION),
         current: VERSION.into(),
@@ -48,10 +45,6 @@ pub fn check() -> Result<Available> {
 /// Replace the running binary with the latest release. Returns the new
 /// version, or `None` if already up to date.
 pub fn update(paths: &Paths, force: bool, reporter: &dyn Reporter) -> Result<Option<String>> {
-    let available = check()?;
-    if !available.newer && !force {
-        return Ok(None);
-    }
     let exe = std::env::current_exe()?.canonicalize()?;
     let dir = exe.parent().context("binary has no parent directory")?;
     // /usr belongs to the package manager even when we could write there
@@ -67,6 +60,10 @@ pub fn update(paths: &Paths, force: bool, reporter: &dyn Reporter) -> Result<Opt
             "{} is not writable; omavn was probably installed by a package manager, update it there",
             dir.display()
         );
+    }
+    let available = check()?;
+    if !available.newer && !force {
+        return Ok(None);
     }
 
     reporter.step(format!("downloading omavn {}", available.latest));

@@ -20,6 +20,34 @@ fn agent() -> ureq::Agent {
         .into()
 }
 
+/// Tag of a repo's latest release, read from the github.com redirect rather
+/// than the API, which allows only 60 unauthenticated requests an hour.
+pub fn github_latest_tag(repo: &str) -> Result<String> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .user_agent(USER_AGENT)
+        .max_redirects(0)
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let url = format!("https://github.com/{repo}/releases/latest");
+    let resp = agent
+        .get(&url)
+        .call()
+        .with_context(|| format!("GET {url}"))?;
+    let location = resp
+        .headers()
+        .get("location")
+        .and_then(|v| v.to_str().ok())
+        .with_context(|| format!("{url} did not redirect to a release"))?;
+    let tag = location.rsplit_once("/tag/").map(|(_, t)| t.to_string());
+    tag.with_context(|| format!("unexpected release redirect: {location}"))
+}
+
+/// Whether `url` answers (following redirects) without an error status.
+pub fn exists(url: &str) -> bool {
+    agent().head(url).call().is_ok()
+}
+
 pub fn get_string(url: &str) -> Result<String> {
     Ok(agent()
         .get(url)

@@ -17,8 +17,8 @@ provides=('omavn')
 conflicts=('omavn')
 # omavn updates itself with `omavn self update` when installed by hand;
 # under pacman it refuses (the binary isn't user-writable), as it should.
-source_x86_64=("https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-x86_64-unknown-linux-gnu.tar.gz")
-source_aarch64=("https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-aarch64-unknown-linux-gnu.tar.gz")
+source_x86_64=("$pkgname-$pkgver-x86_64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-x86_64-unknown-linux-gnu.tar.gz")
+source_aarch64=("$pkgname-$pkgver-aarch64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-aarch64-unknown-linux-gnu.tar.gz")
 sha256sums_x86_64=('36bdcb396cc7dcf4fb19af2c5e20e9963de7924b7a225680bd307280f28e316a')
 sha256sums_aarch64=('8cce0a7d6238aed744480c72c923e9130166c327b150558153f0c15326d0f661')
 

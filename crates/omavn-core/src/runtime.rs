@@ -108,8 +108,8 @@ pub fn proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proton> {
 }
 
 pub fn install_ge_proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proton> {
-    let release = download::github_latest("GloriousEggroll/proton-ge-custom")?;
-    let tag = &release.tag_name;
+    const REPO: &str = "GloriousEggroll/proton-ge-custom";
+    let tag = &download::github_latest_tag(REPO)?;
     let dest_root = paths.runtimes().join("proton");
     // Release tarballs unpack to e.g. `GE-Proton11-9-x86_64`, not the bare tag.
     if let Some(existing) = find_protons(paths)
@@ -118,20 +118,17 @@ pub fn install_ge_proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proto
     {
         return Ok(existing);
     }
-    let asset = |suffix: &str| {
-        release
-            .assets
-            .iter()
-            .find(|a| a.name.ends_with(suffix) && a.name.contains("x86_64"))
-            .with_context(|| format!("{tag} has no {suffix} asset"))
-    };
-    let tarball = asset(".tar.gz")?;
-    let sums = asset(".sha512sum")?;
+    let (tarball, sums) = release_assets(
+        REPO,
+        tag,
+        |n| n.contains("x86_64"),
+        &[".tar.gz", ".sha512sum"],
+    )?;
 
     reporter.step(format!("downloading {tag}"));
-    let file = paths.downloads().join(&tarball.name);
-    download::fetch(&tarball.browser_download_url, &file, reporter)?;
-    let expected = download::get_string(&sums.browser_download_url)?;
+    let file = paths.downloads().join(&tarball.0);
+    download::fetch(&tarball.1, &file, reporter)?;
+    let expected = download::get_string(&sums.1)?;
     download::verify_sha512(&file, expected.split_whitespace().next().unwrap_or(""))?;
 
     reporter.step(format!("unpacking {tag}"));
@@ -145,7 +142,7 @@ pub fn install_ge_proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proto
         .flatten()
         .map(|e| e.path())
         .find(|p| p.join("proton").is_file())
-        .with_context(|| format!("{} has no proton script", tarball.name))?;
+        .with_context(|| format!("{} has no proton script", tarball.0))?;
     let name = unpacked.file_name().unwrap().to_string_lossy().into_owned();
     let dest = dest_root.join(&name);
     let _ = fs::remove_dir_all(&dest);
@@ -157,6 +154,37 @@ pub fn install_ge_proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proto
         path: dest,
         managed: true,
     })
+}
+
+/// (name, url) of two assets of release `tag`, matched by suffix. Names are
+/// guessed from the tag first (the naming both projects use), and checked
+/// against the GitHub API, which is rate-limited, only if a guess is wrong.
+fn release_assets(
+    repo: &str,
+    tag: &str,
+    keep: impl Fn(&str) -> bool,
+    suffixes: &[&str; 2],
+) -> Result<((String, String), (String, String))> {
+    let url = |name: &str| format!("https://github.com/{repo}/releases/download/{tag}/{name}");
+    let guess = |suffix: &str| match suffix {
+        ".tar.gz" | ".sha512sum" => format!("{tag}-x86_64{suffix}"),
+        _ => format!("umu-launcher-{tag}{suffix}"),
+    };
+    let [a, b] = suffixes.map(guess);
+    if download::exists(&url(&a)) && download::exists(&url(&b)) {
+        let (url_a, url_b) = (url(&a), url(&b));
+        return Ok(((a, url_a), (b, url_b)));
+    }
+    let release = download::github_latest(repo)?;
+    let find = |suffix: &str| {
+        release
+            .assets
+            .iter()
+            .find(|a| a.name.ends_with(suffix) && keep(&a.name))
+            .map(|a| (a.name.clone(), a.browser_download_url.clone()))
+            .with_context(|| format!("{tag} has no {suffix} asset"))
+    };
+    Ok((find(suffixes[0])?, find(suffixes[1])?))
 }
 
 /// Path to `umu-run`, downloading the zipapp release if it is not on PATH.
@@ -171,21 +199,18 @@ pub fn umu(paths: &Paths, reporter: &dyn Reporter) -> Result<PathBuf> {
     if which("python3").is_none() {
         bail!("umu-launcher needs python3; install it with your package manager");
     }
-    let release = download::github_latest("Open-Wine-Components/umu-launcher")?;
-    let asset = release
-        .assets
-        .iter()
-        .find(|a| a.name.ends_with("-zipapp.tar"))
-        .context("umu-launcher release has no zipapp")?;
-    reporter.step(format!("downloading umu-launcher {}", release.tag_name));
-    let file = paths.downloads().join(&asset.name);
-    download::fetch(&asset.browser_download_url, &file, reporter)?;
+    const REPO: &str = "Open-Wine-Components/umu-launcher";
+    let tag = download::github_latest_tag(REPO)?;
+    let (asset, _) = release_assets(REPO, &tag, |_| true, &["-zipapp.tar", "-zipapp.tar"])?;
+    reporter.step(format!("downloading umu-launcher {tag}"));
+    let file = paths.downloads().join(&asset.0);
+    download::fetch(&asset.1, &file, reporter)?;
     let dest = paths.runtimes().join("umu");
     fs::create_dir_all(&dest)?;
     tar::Archive::new(File::open(&file)?).unpack(&dest)?;
     let _ = fs::remove_file(&file);
     if !managed.is_file() {
-        bail!("umu-run missing from {}", asset.name);
+        bail!("umu-run missing from {}", asset.0);
     }
     Ok(managed)
 }
