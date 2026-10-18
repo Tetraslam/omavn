@@ -758,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "omavn"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -774,7 +774,7 @@ dependencies = [
 
 [[package]]
 name = "omavn-core"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "bzip2",
