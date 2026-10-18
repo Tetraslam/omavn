@@ -1,6 +1,6 @@
 pkgbase = omavn
 	pkgdesc = Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest
-	pkgver = 0.6.0
+	pkgver = 0.6.1
 	pkgrel = 1
 	url = https://omavn.dev
 	arch = x86_64
@@ -16,7 +16,7 @@ pkgbase = omavn
 	optdepends = lib32-vulkan-icd-loader: render 32-bit games (most VNs) through DXVK
 	options = !debug
 	options = !lto
-	source = omavn-0.6.0.tar.gz::https://github.com/Tetraslam/omavn/archive/refs/tags/v0.6.0.tar.gz
-	sha256sums = b5a4bf74e345f8e58b2c59e4a1d22d35dbaf5a8cc54567a2b8de25f2f1cdc2ab
+	source = omavn-0.6.1.tar.gz::https://github.com/Tetraslam/omavn/archive/refs/tags/v0.6.1.tar.gz
+	sha256sums = 732ad56c671e044bbef62ad25abefce9cc93d7a568d7227db041f26701fd575c
 
 pkgname = omavn
