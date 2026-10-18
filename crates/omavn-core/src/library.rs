@@ -100,7 +100,7 @@ pub fn list(paths: &Paths) -> Result<Vec<Game>> {
             games.push(read(&manifest)?);
         }
     }
-    games.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+    games.sort_by_cached_key(|g| g.title.to_lowercase());
     Ok(games)
 }
 

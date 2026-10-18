@@ -21,6 +21,7 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/mdx": "^2.0.14",
     "@types/node": "^26.6.4",
@@ -29,7 +30,7 @@
     "postcss": "^8.5.28",
     "serve": "^14.2.6",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
-    "@biomejs/biome": "^2.5.15"
-  }
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "pnpm@11.3.0"
 }
