@@ -1,0 +1,6 @@
+id = "himanatsu"
+title = "HimaNatsu: Of Churches, Sunflowers, and Long Summers"
+engine = "renpy"
+
+[match]
+files = ["Himanatsu.exe", "Himanatsu.py"]

@@ -1,0 +1,28 @@
+[package]
+name = "omavn-core"
+description = "Library behind omavn: unpack, install, and run visual novels on Linux"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+bzip2 = "0.6.1"
+encoding_rs = "0.8.42"
+flate2 = "1.1.10"
+memchr = "2.8.3"
+rayon = "1.12.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sevenz-rust2 = "0.24.0"
+sha2 = "0.11.1"
+tar = "0.4.46"
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["formatting", "parsing", "serde"] }
+toml = "1.1.8"
+unrar = "0.5.8"
+ureq = "3.4.2"
+walkdir = "2.5.0"
+zip = { version = "9.0.5", default-features = false, features = ["deflate", "deflate64", "bzip2", "lzma", "zstd", "xz"] }
+

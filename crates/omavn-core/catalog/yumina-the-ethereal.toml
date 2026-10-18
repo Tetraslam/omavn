@@ -1,0 +1,6 @@
+id = "yumina-the-ethereal"
+title = "Yumina the Ethereal"
+notes = "Opens a startup options dialog first; press Start Game. Tick \"Do not display this dialog again\" to skip it."
+
+[match]
+files = ["Yumina.exe", "Yumina.dll"]
