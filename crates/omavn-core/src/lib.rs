@@ -7,6 +7,7 @@
 //! command that runs it (natively when possible, through Proton otherwise).
 
 pub mod archive;
+pub mod art;
 pub mod catalog;
 pub mod desktop;
 pub mod detect;
@@ -16,9 +17,13 @@ pub mod ingest;
 pub mod install;
 pub mod launch;
 pub mod library;
+pub mod meta;
+pub mod omarchy;
 pub mod paths;
 pub mod report;
 pub mod runtime;
+pub mod update;
+pub mod vndb;
 
 pub use paths::Paths;
 pub use report::{Event, Reporter};

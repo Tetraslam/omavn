@@ -26,6 +26,8 @@ pub struct Options {
     pub title: Option<String>,
     /// Force Proton even when a native runner is available.
     pub force_proton: bool,
+    /// Skip VNDB metadata and art.
+    pub offline: bool,
 }
 
 pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result<Game> {
@@ -135,9 +137,11 @@ fn finish(
         .or(entry.as_ref().map(|e| e.title.clone()))
         .unwrap_or_else(|| title_from(&files, id));
 
-    let game = Game {
+    let mut game = Game {
         id: id.to_string(),
         title,
+        original_title: None,
+        vndb: entry.as_ref().and_then(|e| e.vndb.clone()),
         engine: entry.as_ref().and_then(|e| e.engine).unwrap_or(engine),
         runner,
         display: Display::Auto,
@@ -155,6 +159,12 @@ fn finish(
         installed_at: time::OffsetDateTime::now_utc(),
     };
     game.save(paths)?;
+    if !opts.offline {
+        reporter.step("fetching metadata and art");
+        if let Err(e) = crate::meta::refresh(paths, &mut game, None, reporter) {
+            reporter.warn(format!("skipped art: {e}"));
+        }
+    }
     Ok(game)
 }
 

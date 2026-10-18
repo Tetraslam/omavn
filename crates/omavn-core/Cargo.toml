@@ -11,6 +11,7 @@ anyhow = "1.0.104"
 bzip2 = "0.6.1"
 encoding_rs = "0.8.42"
 flate2 = "1.1.10"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "ico", "bmp"] }
 memchr = "2.8.3"
 rayon = "1.12.0"
 serde = { version = "1.0.229", features = ["derive"] }

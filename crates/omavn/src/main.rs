@@ -30,7 +30,11 @@ enum Cmd {
     #[command(visible_alias = "add")]
     Install {
         /// The archive, installer, or folder you downloaded.
-        source: PathBuf,
+        #[arg(required_unless_present = "pick")]
+        source: Option<PathBuf>,
+        /// Choose the download from a menu (Omarchy).
+        #[arg(long)]
+        pick: bool,
         /// Library id (defaults to a slug of the title).
         #[arg(long)]
         id: Option<String>,
@@ -40,6 +44,9 @@ enum Cmd {
         /// Run through Proton even if a native runtime is available.
         #[arg(long)]
         proton: bool,
+        /// Skip the VNDB lookup and art download.
+        #[arg(long)]
+        offline: bool,
     },
     /// Launch an installed game.
     #[command(visible_alias = "play")]
@@ -71,6 +78,20 @@ enum Cmd {
     /// List installed games.
     #[command(visible_alias = "ls")]
     List,
+    /// Pick a game from a cover-art grid and play it (Omarchy's picker, or a text menu).
+    #[command(visible_alias = "pick")]
+    Library,
+    /// Refresh a game's VNDB metadata, art, and launcher entry.
+    Meta {
+        /// Game id or title; omit with --all.
+        game: Option<String>,
+        /// Use this VNDB id (e.g. v548) instead of searching by title.
+        #[arg(long)]
+        vndb: Option<String>,
+        /// Refresh every installed game.
+        #[arg(long, conflicts_with = "game")]
+        all: bool,
+    },
     /// Change a game setting: display (auto|gamescope|window), target, title, env.NAME.
     ///
     /// Omit the value to reset it (for env.NAME, to remove the variable).
@@ -84,7 +105,11 @@ enum Cmd {
     /// Uninstall a game, including its saves.
     #[command(visible_alias = "rm")]
     Remove {
-        game: String,
+        #[arg(required_unless_present = "pick")]
+        game: Option<String>,
+        /// Choose the game from a menu (Omarchy).
+        #[arg(long)]
+        pick: bool,
         /// Don't ask for confirmation.
         #[arg(short, long)]
         yes: bool,
@@ -104,6 +129,17 @@ enum Cmd {
     },
     /// Check that this machine can run games.
     Doctor,
+    /// Set up (or undo) Omarchy integration: menu entries, window rules, packages.
+    Omarchy {
+        #[command(subcommand)]
+        command: OmarchyCmd,
+    },
+    /// Manage omavn itself.
+    #[command(name = "self")]
+    Itself {
+        #[command(subcommand)]
+        command: SelfAction,
+    },
     /// Report a bug, a game that doesn't work, or an idea. Opens a prefilled GitHub issue.
     Feedback {
         /// What happened, or what you'd like.
@@ -131,6 +167,32 @@ enum RuntimeCmd {
         /// Ren'Py version (for `renpy`).
         version: Option<String>,
     },
+}
+
+#[derive(Subcommand)]
+enum OmarchyCmd {
+    /// Install gamescope and umu-launcher, add window rules and menu entries.
+    Setup {
+        /// Don't install packages (no sudo).
+        #[arg(long)]
+        skip_packages: bool,
+    },
+    /// Remove the window rules and menu entries.
+    Remove,
+    /// Show what is set up.
+    Status,
+}
+
+#[derive(Subcommand)]
+enum SelfAction {
+    /// Update omavn to the latest release.
+    Update {
+        /// Reinstall even if already up to date.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Check whether a newer release exists.
+    Check,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -165,18 +227,34 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
     match cli.command {
         Cmd::Install {
             source,
+            pick,
             id,
             title,
             proton,
+            offline,
         } => {
+            let source = match source {
+                Some(s) => s,
+                None => pick_download(pick)?,
+            };
             let opts = install::Options {
                 source,
                 id,
                 title,
                 force_proton: proton,
+                offline,
             };
             let game = install::install(&paths, &opts, ui)?;
             ui.finish_progress();
+            if omavn_core::desktop::has_display() && !cli.json {
+                let exe = std::env::current_exe()?.display().to_string();
+                omavn_core::omarchy::notify(
+                    &format!("{} is ready", game.title),
+                    "Click to play",
+                    Some(&omavn_core::art::cover(&paths, &game)),
+                    &[&exe, "run", &game.id],
+                );
+            }
             ui.result(&game, || {
                 ui.success(&format!("installed {} as `{}`", game.title, game.id));
                 ui.line(&format!("  play it: omavn run {}", game.id));
@@ -245,6 +323,23 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 status.code().unwrap_or(1).clamp(0, 255) as u8
             ));
         }
+        Cmd::Library => return library_picker(&paths, ui),
+        Cmd::Meta { game, vndb, all } => {
+            let mut games = if all {
+                library::list(&paths)?
+            } else {
+                let q = game.context("which game? (or --all)")?;
+                vec![library::find(&paths, &q)?]
+            };
+            for g in &mut games {
+                (ui as &dyn omavn_core::Reporter).step(g.title.clone());
+                omavn_core::meta::refresh(&paths, g, vndb.as_deref(), ui)?;
+            }
+            ui.finish_progress();
+            ui.result(&games, || {
+                ui.success(&format!("refreshed {} game(s)", games.len()))
+            });
+        }
         Cmd::Set { game, key, value } => {
             let mut game = library::find(&paths, &game)?;
             set(&mut game, &key, value.as_deref())?;
@@ -303,8 +398,15 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 }
             });
         }
-        Cmd::Remove { game, yes } => {
-            let game = library::find(&paths, &game)?;
+        Cmd::Remove { game, pick, yes } => {
+            let game = match game {
+                Some(g) => library::find(&paths, &g)?,
+                None if pick => match pick_game(&paths)? {
+                    Some(g) => g,
+                    None => return Ok(ExitCode::SUCCESS),
+                },
+                None => bail!("which game?"),
+            };
             let dir = game.dir(&paths);
             if !yes
                 && !ui.confirm(&format!(
@@ -315,6 +417,7 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             {
                 bail!("cancelled (pass --yes to skip this prompt)");
             }
+            omavn_core::meta::remove(&paths, &game);
             std::fs::remove_dir_all(&dir)?;
             ui.result(&serde_json::json!({ "removed": game.id }), || {
                 ui.success(&format!("removed {}", game.id))
@@ -437,6 +540,90 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 return Ok(ExitCode::FAILURE);
             }
         }
+        Cmd::Omarchy { command } => match command {
+            OmarchyCmd::Setup { skip_packages } => {
+                let exe = std::env::current_exe()?;
+                let changes = omavn_core::omarchy::setup(&exe, skip_packages)?;
+                ui.result(&changes, || {
+                    if changes.is_empty() {
+                        ui.success("already set up");
+                    }
+                    for c in &changes {
+                        ui.success(c);
+                    }
+                    ui.line("open your library from the Omarchy menu (Visual Novels) or run: omavn library");
+                });
+            }
+            OmarchyCmd::Remove => {
+                let changes = omavn_core::omarchy::remove()?;
+                ui.result(&changes, || {
+                    for c in &changes {
+                        ui.success(c);
+                    }
+                });
+            }
+            OmarchyCmd::Status => {
+                let s = omavn_core::omarchy::status();
+                ui.result(&s, || {
+                    ui.check(
+                        s.omarchy,
+                        true,
+                        "omarchy",
+                        if s.omarchy { "detected" } else { "not found" },
+                    );
+                    for (p, ok) in &s.packages {
+                        ui.check(*ok, false, p, if *ok { "installed" } else { "missing" });
+                    }
+                    ui.check(
+                        s.window_rules,
+                        false,
+                        "window rules",
+                        if s.window_rules {
+                            "loaded"
+                        } else {
+                            "not set up"
+                        },
+                    );
+                    ui.check(
+                        s.menu,
+                        false,
+                        "menu",
+                        if s.menu {
+                            "Visual Novels entry present"
+                        } else {
+                            "not set up"
+                        },
+                    );
+                });
+            }
+        },
+        Cmd::Itself { command } => match command {
+            SelfAction::Check => {
+                let a = omavn_core::update::check()?;
+                ui.result(&a, || {
+                    if a.newer {
+                        ui.line(&format!(
+                            "omavn {} is out (you have {}); run: omavn self update",
+                            a.latest, a.current
+                        ));
+                    } else {
+                        ui.success(&format!("omavn {} is the latest", a.current));
+                    }
+                });
+            }
+            SelfAction::Update { force } => {
+                let updated = omavn_core::update::update(&paths, force, ui)?;
+                ui.finish_progress();
+                let current = omavn_core::update::VERSION;
+                ui.result(
+                    &serde_json::json!({ "updated": updated, "previous": current }),
+                    || match &updated {
+                        Some(v) => ui.success(&format!("updated omavn {current} -> {v}")),
+                        None => ui.success(&format!("omavn {current} is already the latest")),
+                    },
+                );
+            }
+        },
         Cmd::Feedback {
             message,
             kind,
@@ -462,6 +649,98 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// Ask for a download with Omarchy's file menu. A file inside a subfolder
+/// (e.g. `Dies irae/MG1041_1.zip`) means the whole folder: multi-part
+/// downloads and installers with data files come as folders.
+fn pick_download(pick: bool) -> Result<PathBuf> {
+    if !pick || runtime::which("omarchy-menu-file").is_none() {
+        bail!("pass the download to install, e.g. omavn install ~/Downloads/game.zip");
+    }
+    let home = PathBuf::from(std::env::var_os("HOME").context("HOME is not set")?);
+    let root = std::env::var_os("XDG_DOWNLOAD_DIR")
+        .map(PathBuf::from)
+        .unwrap_or(home.join("Downloads"));
+    let out = std::process::Command::new("omarchy-menu-file")
+        .arg("Visual novel download")
+        .arg(&root)
+        .arg("zip rar 7z exe 001 msi")
+        .output()?;
+    let picked = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
+    if picked.as_os_str().is_empty() {
+        bail!("nothing picked");
+    }
+    match picked.parent() {
+        Some(dir) if dir != root => Ok(dir.to_path_buf()),
+        _ => Ok(picked),
+    }
+}
+
+fn pick_game(paths: &Paths) -> Result<Option<Game>> {
+    let games = library::list(paths)?;
+    if runtime::which("omarchy-menu-select").is_none() {
+        bail!("pass the game to remove");
+    }
+    let rows: Vec<String> = games
+        .iter()
+        .map(|g| format!("󰂺\t{}\t{}", g.title, g.id))
+        .collect();
+    let out = std::process::Command::new("omarchy-menu-select")
+        .arg("Remove visual novel")
+        .args(&rows)
+        .output()?;
+    let sel = String::from_utf8_lossy(&out.stdout);
+    let Some(id) = sel.trim().split('\t').nth(1) else {
+        return Ok(None);
+    };
+    Ok(Some(library::load(paths, id)?))
+}
+
+/// Show the library as a cover grid (Omarchy) or a numbered list, then play the pick.
+fn library_picker(paths: &Paths, ui: &Ui) -> Result<ExitCode> {
+    let games = library::list(paths)?;
+    if games.is_empty() {
+        bail!("no games yet. install one with: omavn install <download>");
+    }
+    for g in games
+        .iter()
+        .filter(|g| !omavn_core::art::card(paths, g).exists())
+    {
+        let _ = omavn_core::art::render(paths, g);
+    }
+    let picked = if runtime::which("omarchy-menu-images").is_some() {
+        let out = std::process::Command::new("omarchy-menu-images")
+            .args(["--show-labels", "--filterable", "--print-name"])
+            .arg(omavn_core::art::library_dir(paths))
+            .output()?;
+        let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if name.is_empty() {
+            return Ok(ExitCode::SUCCESS);
+        }
+        omavn_core::art::game_for_entry(paths, &name)
+            .with_context(|| format!("no game for library entry `{name}`"))?
+    } else {
+        for (i, g) in games.iter().enumerate() {
+            ui.line(&format!("{:>3}  {}", i + 1, g.title));
+        }
+        eprint!("play which? ");
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line)?;
+        let n: usize = line.trim().parse().context("not a number")?;
+        games
+            .get(n.wrapping_sub(1))
+            .context("no such game")?
+            .id
+            .clone()
+    };
+    let exe = std::env::current_exe()?;
+    let status = std::process::Command::new(exe)
+        .args(["run", &picked])
+        .status()?;
+    Ok(ExitCode::from(
+        status.code().unwrap_or(1).clamp(0, 255) as u8
+    ))
 }
 
 fn set(game: &mut Game, key: &str, value: Option<&str>) -> Result<()> {

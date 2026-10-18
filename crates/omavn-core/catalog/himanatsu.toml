@@ -1,5 +1,6 @@
 id = "himanatsu"
 title = "HimaNatsu: Of Churches, Sunflowers, and Long Summers"
+vndb = "v10557"
 engine = "renpy"
 
 [match]

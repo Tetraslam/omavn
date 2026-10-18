@@ -19,6 +19,9 @@ include!(concat!(env!("OUT_DIR"), "/catalog.rs"));
 pub struct Entry {
     pub id: String,
     pub title: String,
+    /// VNDB id, pinned when search would pick the wrong entry.
+    #[serde(default)]
+    pub vndb: Option<String>,
     #[serde(default)]
     pub engine: Option<Engine>,
     #[serde(rename = "match")]

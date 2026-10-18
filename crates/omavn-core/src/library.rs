@@ -45,6 +45,11 @@ impl Display {
 pub struct Game {
     pub id: String,
     pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_title: Option<String>,
+    /// VNDB id, e.g. `v548`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vndb: Option<String>,
     pub engine: Engine,
     pub runner: Runner,
     #[serde(default, skip_serializing_if = "Display::is_auto")]

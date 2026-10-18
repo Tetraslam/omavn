@@ -1,5 +1,6 @@
 id = "dies-irae"
 title = "Dies irae"
+vndb = "v548"
 engine = "malie"
 default_target = "fabula"
 notes = "Deluxe package with both editions. Saves live in the prefix under AppData/Roaming/light."

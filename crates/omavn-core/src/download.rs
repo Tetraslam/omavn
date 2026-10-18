@@ -29,6 +29,16 @@ pub fn get_string(url: &str) -> Result<String> {
         .read_to_string()?)
 }
 
+pub fn post_json(url: &str, body: &serde_json::Value) -> Result<String> {
+    Ok(agent()
+        .post(url)
+        .header("Content-Type", "application/json")
+        .send(body.to_string())
+        .with_context(|| format!("POST {url}"))?
+        .body_mut()
+        .read_to_string()?)
+}
+
 /// Download `url` to `dest` atomically (via a `.part` file), reporting bytes.
 pub fn fetch(url: &str, dest: &Path, reporter: &dyn Reporter) -> Result<()> {
     if let Some(parent) = dest.parent() {
