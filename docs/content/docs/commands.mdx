@@ -98,6 +98,14 @@ omavn exec <game> -- /path/to/patch.exe
 
 Runs a program inside a game's Wine prefix. Handy for fan patches and config tools.
 
+## winetricks
+
+```bash
+omavn winetricks <game> quartz wmp9
+```
+
+Installs Windows components into a game's prefix, for games whose movies or installers need them. Proton's built-in versions are usually better, so only reach for this when something doesn't work. Installed verbs are recorded in the game's manifest.
+
 ## inspect
 
 ```bash

@@ -32,6 +32,9 @@ pub struct Entry {
     pub default_target: Option<String>,
     #[serde(default)]
     pub env: BTreeMap<String, String>,
+    /// Winetricks verbs the game needs, applied at install (Proton games).
+    #[serde(default)]
+    pub winetricks: Vec<String>,
     #[serde(default)]
     pub notes: Option<String>,
 }

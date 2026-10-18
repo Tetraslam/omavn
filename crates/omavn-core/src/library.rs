@@ -60,6 +60,9 @@ pub struct Game {
     pub targets: Vec<Target>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub renpy_version: Option<String>,
+    /// Winetricks verbs installed into the prefix.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub winetricks: Vec<String>,
     /// Extra environment for every launch.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,

@@ -162,3 +162,36 @@ pub fn proton_spec(
         cwd,
     })
 }
+
+/// Install winetricks verbs (e.g. `quartz`, `wmp9`) into a game's prefix.
+pub fn winetricks(
+    paths: &Paths,
+    game: &Game,
+    verbs: &[String],
+    reporter: &dyn Reporter,
+) -> Result<()> {
+    let mut args: Vec<OsString> = vec!["winetricks".into(), "-q".into()];
+    args.extend(verbs.iter().map(OsString::from));
+    let spec = proton_spec(
+        paths,
+        &game.prefix(paths),
+        &game.umu_id(),
+        args,
+        game.dir(paths),
+        reporter,
+    )?;
+    let log = std::fs::File::create(game.dir(paths).join("winetricks.log"))?;
+    let status = spec
+        .command()
+        .stdout(log.try_clone()?)
+        .stderr(log)
+        .status()?;
+    if !status.success() {
+        anyhow::bail!(
+            "winetricks {} failed ({status}); see {}",
+            verbs.join(" "),
+            game.dir(paths).join("winetricks.log").display()
+        );
+    }
+    Ok(())
+}

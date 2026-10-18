@@ -121,6 +121,12 @@ enum Cmd {
         #[arg(last = true, required = true)]
         command: Vec<OsString>,
     },
+    /// Install Windows components into a game's prefix with winetricks (e.g. quartz wmp9).
+    Winetricks {
+        game: String,
+        #[arg(required = true)]
+        verbs: Vec<String>,
+    },
     /// Look at a download or folder and report what omavn would do, without installing.
     Inspect { source: PathBuf },
     /// Manage Proton, umu-launcher, and Ren'Py runtimes.
@@ -581,6 +587,26 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             if !ok {
                 return Ok(ExitCode::FAILURE);
             }
+        }
+        Cmd::Winetricks { game, verbs } => {
+            let mut game = library::find(&paths, &game)?;
+            if game.runner != library::Runner::Proton {
+                bail!(
+                    "{} runs natively; winetricks only applies to Proton games",
+                    game.title
+                );
+            }
+            (ui as &dyn omavn_core::Reporter).step(format!("winetricks {}", verbs.join(" ")));
+            launch::winetricks(&paths, &game, &verbs, ui)?;
+            for v in verbs {
+                if !game.winetricks.contains(&v) {
+                    game.winetricks.push(v);
+                }
+            }
+            game.save(&paths)?;
+            ui.result(&game.winetricks, || {
+                ui.success(&format!("installed into {}", game.id))
+            });
         }
         Cmd::Saves { game, open } => {
             let game = library::find(&paths, &game)?;

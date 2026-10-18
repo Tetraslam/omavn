@@ -160,16 +160,27 @@ fn finish(
         default_target,
         targets,
         renpy_version,
+        winetricks: Vec::new(),
         env: entry
             .as_ref()
             .map(|e| e.env.clone())
             .unwrap_or_else(BTreeMap::new),
         catalog_id: entry.as_ref().map(|e| e.id.clone()),
-        notes: entry.and_then(|e| e.notes),
+        notes: entry.as_ref().and_then(|e| e.notes.clone()),
         source: fs::canonicalize(&opts.source).unwrap_or_else(|_| opts.source.clone()),
         installed_at: time::OffsetDateTime::now_utc(),
     };
     game.save(paths)?;
+    let verbs = entry
+        .as_ref()
+        .map(|e| e.winetricks.clone())
+        .unwrap_or_default();
+    if runner == Runner::Proton && !verbs.is_empty() {
+        reporter.step(format!("installing {} with winetricks", verbs.join(", ")));
+        launch::winetricks(paths, &game, &verbs, reporter)?;
+        game.winetricks = verbs;
+        game.save(paths)?;
+    }
     if !opts.offline {
         reporter.step("fetching metadata and art");
         if let Err(e) = crate::meta::refresh(paths, &mut game, None, reporter) {
