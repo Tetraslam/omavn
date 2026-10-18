@@ -1,0 +1,37 @@
+---
+title: Catalog
+description: Teach omavn about a specific game.
+---
+
+The catalog is a folder of small TOML files, one per title. omavn matches an entry when every file it lists exists in the game folder (case-insensitive), and prefers the entry with the most matching files.
+
+```toml
+id = "dies-irae"
+title = "Dies irae"
+engine = "malie"
+default_target = "fabula"
+notes = "Deluxe package with both editions."
+
+[match]
+files = ["malie.exe", "malie_fabula.exe", "malie.ini"]
+
+[[target]]
+id = "fabula"
+name = "Dies irae ~Acta est Fabula~ HD"
+exe = "malie_fabula.exe"
+
+[[target]]
+id = "amantes"
+name = "Dies irae ~Amantes amentes~ HD (all ages)"
+exe = "malie.exe"
+
+[env]
+# any environment variables the game needs
+```
+
+All fields except `id`, `title`, and `match` are optional. Without `[[target]]`, omavn keeps its own entry point detection.
+
+## Adding one
+
+- **Just for you:** drop the file in `~/.config/omavn/catalog/`, then reinstall the game.
+- **For everyone:** add it to [`crates/omavn-core/catalog/`](https://github.com/Tetraslam/omavn/tree/master/crates/omavn-core/catalog) and open a pull request. The file name must be `<id>.toml`; `cargo test` checks that.

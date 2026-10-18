@@ -1,0 +1,55 @@
+---
+title: How it works
+description: What happens between "omavn install" and the title screen.
+---
+
+## 1. Unwrap
+
+Downloads come wrapped in layers. Dies irae from JAST is three zips, each holding one volume of a split RAR whose first volume is a self-extracting `.exe`. omavn peels layers until it reaches something playable:
+
+- groups multi-volume sets (`.part1.exe`/`.part2.rar`, `.rar`/`.r00`, `.7z.001`)
+- detects RAR self-extractors by content, not name
+- decodes Shift-JIS file names in zips, which most Japanese releases use
+- drops `__MACOSX` and other packer junk
+
+It stops as soon as it finds a real `.exe`, so data archives that belong to an installer (Yumina's `yumina1.dat` is secretly a zip) are left alone. Your download is never modified; staging uses symlinks and only extracted layers take disk space.
+
+## 2. Classify
+
+The unwrapped folder is either a **game** or an **installer**.
+
+- Installers are fingerprinted (NSIS, Inno Setup, MSI, InstallShield, WiX) and run unattended under Proton when the framework supports it. Chained DirectX redist wizards are skipped, since Proton already provides those DLLs.
+- Games get an engine fingerprint (Ren'Py, KiriKiri, Malie, Siglus, BGI, NScripter, Artemis, CatSystem2, QLIE, YU-RIS, Unity, RPG Maker, TyranoScript) and a ranked list of entry points, with uninstallers, redists, and helper binaries filtered out.
+
+## 3. Catalog
+
+Some things heuristics can't know: that `malie_fabula.exe` is *Acta est Fabula* and `malie.exe` is the all-ages *Amantes amentes*. The [catalog](/docs/catalog) fills those gaps per title.
+
+## 4. Pick a runner
+
+| Runner | Used for | How |
+| --- | --- | --- |
+| native Ren'Py | Ren'Py 7.4+ and 8.x | runs the official Linux Ren'Py runtime of the same version against the game's files |
+| Proton | everything else | GE-Proton through umu-launcher, one Wine prefix per game |
+
+Native Ren'Py runs faster, uses your real audio and GPU stack, and touches nothing in the game folder.
+
+## 5. Library
+
+Each game gets `~/.local/share/omavn/games/<id>/game.toml`, a plain manifest you can read or edit:
+
+```toml
+id = "dies-irae"
+title = "Dies irae"
+engine = "malie"
+runner = "proton"
+files = "files"
+default_target = "fabula"
+
+[[targets]]
+id = "fabula"
+name = "Dies irae ~Acta est Fabula~ HD"
+exe = "malie_fabula.exe"
+```
+
+Add an `[env]` table for per-game environment variables, e.g. `LC_ALL = "ja_JP.UTF-8"` for untranslated Japanese releases.

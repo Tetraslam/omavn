@@ -1,0 +1,47 @@
+---
+title: Quickstart
+description: From "I bought a visual novel" to playing it on Linux in two commands.
+---
+
+omavn takes whatever you downloaded (a zip, a stack of split rars, an installer, a plain folder) and turns it into a game you can launch. It figures out the engine, runs installers unattended, and picks the best way to run it: natively where possible, through Proton otherwise.
+
+## Install omavn
+
+```bash
+cargo install --git https://github.com/Tetraslam/omavn omavn
+```
+
+Prebuilt binaries are coming. See [Installing omavn](/docs/installing) for details.
+
+## Add a game
+
+Point it at the download exactly as you got it. Don't unzip anything first.
+
+```bash
+omavn install ~/Downloads/Himanatsu_final.zip
+omavn install ~/Downloads/"Dies irae"          # a folder of MG1041_1.zip, _2.zip, _3.zip
+omavn install ~/Downloads/"Yumina the Ethereal" # Setup.zip plus yumina1-3.dat
+```
+
+## Play it
+
+```bash
+omavn run dies-irae
+```
+
+Ids, prefixes, and title fragments all work: `omavn run dies`, `omavn run hima`.
+
+## Something broke?
+
+```bash
+omavn feedback --kind game --game dies-irae "voices cut out in chapter 2"
+```
+
+That opens a GitHub issue with your system details already filled in. See [Feedback](/docs/feedback).
+
+<Cards>
+  <Card title="Commands" href="/docs/commands" />
+  <Card title="How it works" href="/docs/how-it-works" />
+  <Card title="Compatibility" href="/docs/compatibility" />
+  <Card title="For agents and scripts" href="/docs/agents" />
+</Cards>

@@ -1,0 +1,42 @@
+---
+title: Troubleshooting
+description: Common problems and fixes.
+---
+
+## The game shows a settings dialog first
+
+Many VNs open a launcher or config dialog before the game, on Windows too. Pick your options and start the game; most have a "don't show again" box.
+
+## An installer opened a window
+
+omavn runs NSIS, Inno Setup, and MSI installers unattended. Other frameworks (InstallShield, custom installers) need you to click through. Any install location works; omavn finds the game afterwards.
+
+## Japanese text is garbled
+
+Untranslated Japanese releases often need a Japanese locale. Add to the game's `game.toml`:
+
+```toml
+[env]
+LC_ALL = "ja_JP.UTF-8"
+```
+
+## Use a different Proton
+
+```bash
+omavn runtime list
+OMAVN_PROTON=GE-Proton11-9 omavn run <game>
+```
+
+## See what's actually running
+
+```bash
+omavn run <game> --print
+```
+
+prints the full command, environment, and working directory, so you can run it by hand and read the output.
+
+## Still stuck
+
+```bash
+omavn feedback --kind game --game <game> "what happened"
+```

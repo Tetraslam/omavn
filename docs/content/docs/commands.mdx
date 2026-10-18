@@ -1,0 +1,83 @@
+---
+title: Commands
+description: Every omavn command. Add --json to any of them for machine-readable output.
+---
+
+## install
+
+```bash
+omavn install <download> [--id ID] [--title TITLE] [--proton]
+```
+
+Unpacks, installs, and registers a game. `<download>` can be a file or a folder. Alias: `add`.
+
+- `--id` sets the library id (default: from the catalog or the folder name)
+- `--proton` runs a Ren'Py game through Proton instead of natively
+
+## run
+
+```bash
+omavn run <game> [--target ID] [--detach] [--print] [-- args...]
+```
+
+Launches a game. Alias: `play`.
+
+- `--target` picks another entry point, like a different edition or a config tool (`omavn info` lists them)
+- `--print` shows the exact command instead of running it
+- `--detach` returns right away
+
+## list, info
+
+```bash
+omavn list
+omavn info <game>
+```
+
+`info` shows the engine, runner, file and prefix paths, entry points, and notes.
+
+## remove
+
+```bash
+omavn remove <game> [--yes]
+```
+
+Deletes the game, its prefix, and its saves. Asks first unless you pass `--yes`. Alias: `rm`.
+
+## exec
+
+```bash
+omavn exec <game> -- winecfg
+omavn exec <game> -- /path/to/patch.exe
+```
+
+Runs a program inside a game's Wine prefix. Handy for fan patches and config tools.
+
+## inspect
+
+```bash
+omavn inspect <download>
+```
+
+Reports what omavn would do (game or installer, engine, entry points) without installing.
+
+## runtime
+
+```bash
+omavn runtime list
+omavn runtime install proton
+omavn runtime install renpy 8.5.2
+```
+
+You rarely need this; runtimes are fetched when a game needs them. Set `OMAVN_PROTON` to a name from `runtime list` (or a path) to pin a Proton build.
+
+## doctor
+
+Checks python3, display, Vulkan, disk space, and runtimes.
+
+## feedback
+
+```bash
+omavn feedback [--kind bug|game|idea] [--game GAME] [message...]
+```
+
+Opens a prefilled GitHub issue. See [Feedback](/docs/feedback).

@@ -1,0 +1,16 @@
+---
+title: Feedback
+description: Bugs, game reports, and ideas, in one command.
+---
+
+```bash
+omavn feedback "install hangs on the progress bar"
+omavn feedback --kind game --game yumina "works, but the opening movie is black"
+omavn feedback --kind idea "steam deck controls"
+```
+
+omavn opens a GitHub issue in your browser with the title, labels, and your system details (distro, kernel, session, Proton version) already filled in. With `--game`, it adds the engine, runner, entry points, and the name of the download you installed from. Nothing is sent until you press submit, and you can edit everything first.
+
+`--no-open` prints the link instead, which is handy over SSH.
+
+You can also [open an issue directly](https://github.com/Tetraslam/omavn/issues/new).

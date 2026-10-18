@@ -1,0 +1,39 @@
+---
+title: Installing omavn
+description: One binary, no system packages beyond python3.
+---
+
+## From source
+
+Needs a Rust toolchain ([rustup.rs](https://rustup.rs)) and a C++ compiler (for the bundled unrar).
+
+```bash
+cargo install --git https://github.com/Tetraslam/omavn omavn
+```
+
+## What omavn downloads for you
+
+Nothing is installed system-wide. Everything lives in `~/.local/share/omavn`, and omavn reuses what you already have before downloading anything.
+
+| Runtime | When | Reused from |
+| --- | --- | --- |
+| GE-Proton | first Windows game | Steam's `compatibilitytools.d`, Steam's own Proton |
+| umu-launcher | first Windows game | `umu-run` on your `PATH` |
+| Ren'Py (Linux) | first Ren'Py game of that version | |
+
+You need `python3` (umu-launcher is a Python app) and a working GPU driver. `omavn doctor` checks both.
+
+```bash
+omavn doctor
+```
+
+## Where things go
+
+| Path | What |
+| --- | --- |
+| `~/.local/share/omavn/games/<id>/files` | the game |
+| `~/.local/share/omavn/games/<id>/prefix` | its Wine prefix, including saves |
+| `~/.local/share/omavn/runtimes` | Proton, umu, Ren'Py |
+| `~/.config/omavn/catalog` | your own [catalog entries](/docs/catalog) |
+
+Set `OMAVN_HOME` to keep everything under one directory instead.

@@ -1,0 +1,39 @@
+---
+title: For agents and scripts
+description: JSON output, stable exit codes, and docs as plain text.
+---
+
+## JSON mode
+
+Pass `--json` to any command:
+
+- the result is one JSON document on **stdout**
+- progress is JSON lines on **stderr**: `{"event":"step","message":"extracting Setup.zip"}`, `{"event":"progress","done":123,"total":456}`
+- errors are a JSON line on stderr, with exit code 1: `{"event":"error","message":"...","causes":[...]}`
+
+```bash
+omavn --json install ~/Downloads/game.zip | jq .id
+omavn --json list | jq -r '.[].id'
+omavn --json run dies-irae --print   # the exact program, argv, env, cwd
+```
+
+Nothing prompts in JSON mode or without a terminal. `remove` needs `--yes`.
+
+## Docs as text
+
+This site serves [`/llms.txt`](/llms.txt) (index) and [`/llms-full.txt`](/llms-full.txt) (everything), and each page has a markdown version.
+
+## Building on omavn
+
+The CLI is a thin layer over the `omavn-core` crate. Launchers, GUIs, and library managers can use it directly:
+
+```rust
+use omavn_core::{Paths, install, launch, library, report::Silent};
+
+let paths = Paths::from_env()?;
+let game = install::install(&paths, &install::Options { source: "Himanatsu_final.zip".into(), ..Default::default() }, &Silent)?;
+let spec = launch::game(&paths, &game, None, &[], &Silent)?;
+spec.command().spawn()?;
+```
+
+Implement `Reporter` to render progress your own way. Game manifests are plain TOML in `~/.local/share/omavn/games/*/game.toml`, so tools in any language can read the library.
