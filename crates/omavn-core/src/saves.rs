@@ -66,13 +66,14 @@ pub fn find(paths: &Paths, game: &Game) -> Vec<PathBuf> {
     let files = game.files_dir(paths);
     for entry in WalkDir::new(&files).max_depth(2).into_iter().flatten() {
         let name = entry.file_name().to_string_lossy().to_lowercase();
-        if entry.file_type().is_dir() && (name.starts_with("save") || name == "userdata") {
-            if let Some(t) = newest_file(entry.path()) {
-                found.push((t, entry.into_path()));
-            }
+        if entry.file_type().is_dir()
+            && (name.starts_with("save") || name == "userdata")
+            && let Some(t) = newest_file(entry.path())
+        {
+            found.push((t, entry.into_path()));
         }
     }
-    found.sort_by(|a, b| b.0.cmp(&a.0));
+    found.sort_by_key(|f| std::cmp::Reverse(f.0));
     found.dedup_by(|a, b| a.1 == b.1);
     found.into_iter().map(|(_, p)| p).collect()
 }
