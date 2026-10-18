@@ -54,6 +54,14 @@ pub fn update(paths: &Paths, force: bool, reporter: &dyn Reporter) -> Result<Opt
     }
     let exe = std::env::current_exe()?.canonicalize()?;
     let dir = exe.parent().context("binary has no parent directory")?;
+    // /usr belongs to the package manager even when we could write there
+    // (as root); replacing its files would corrupt the package database.
+    if exe.starts_with("/usr") {
+        bail!(
+            "omavn was installed by your package manager ({}); update it there, e.g. yay -Syu",
+            exe.display()
+        );
+    }
     if fs::metadata(dir)?.permissions().readonly() || !writable(dir) {
         bail!(
             "{} is not writable; omavn was probably installed by a package manager, update it there",

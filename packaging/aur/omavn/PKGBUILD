@@ -1,0 +1,49 @@
+# Maintainer: Shresht Bhowmick <bhowmickshresht@gmail.com>
+pkgname=omavn
+pkgver=0.6.0
+pkgrel=1
+pkgdesc="Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest"
+arch=('x86_64' 'aarch64')
+url="https://omavn.dev"
+license=('Apache-2.0')
+depends=('glibc' 'libgcc' 'libstdc++' 'umu-launcher')
+makedepends=('cargo')
+optdepends=(
+  'gamescope: scale fixed-resolution games correctly under tiling window managers'
+  'libarchive: unpack ISO disc images (bsdtar)'
+  'lib32-vulkan-icd-loader: render 32-bit games (most VNs) through DXVK'
+)
+options=('!debug' '!lto')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Tetraslam/omavn/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('b5a4bf74e345f8e58b2c59e4a1d22d35dbaf5a8cc54567a2b8de25f2f1cdc2ab')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p omavn
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen --release
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/omavn "$pkgdir/usr/bin/omavn"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+
+  local bin=target/release/omavn
+  "$bin" completions bash | install -Dm644 /dev/stdin "$pkgdir/usr/share/bash-completion/completions/omavn"
+  "$bin" completions zsh | install -Dm644 /dev/stdin "$pkgdir/usr/share/zsh/site-functions/_omavn"
+  "$bin" completions fish | install -Dm644 /dev/stdin "$pkgdir/usr/share/fish/vendor_completions.d/omavn.fish"
+}

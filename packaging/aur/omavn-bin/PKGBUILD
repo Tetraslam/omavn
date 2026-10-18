@@ -1,0 +1,34 @@
+# Maintainer: Shresht Bhowmick <bhowmickshresht@gmail.com>
+pkgname=omavn-bin
+pkgver=0.6.0
+pkgrel=1
+pkgdesc="Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest"
+arch=('x86_64' 'aarch64')
+url="https://omavn.dev"
+license=('Apache-2.0')
+depends=('glibc' 'libgcc' 'libstdc++' 'umu-launcher')
+optdepends=(
+  'gamescope: scale fixed-resolution games correctly under tiling window managers'
+  'libarchive: unpack ISO disc images (bsdtar)'
+  'lib32-vulkan-icd-loader: render 32-bit games (most VNs) through DXVK'
+)
+options=('!debug')
+provides=('omavn')
+conflicts=('omavn')
+# omavn updates itself with `omavn self update` when installed by hand;
+# under pacman it refuses (the binary isn't user-writable), as it should.
+source_x86_64=("https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-x86_64-unknown-linux-gnu.tar.gz")
+source_aarch64=("https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-aarch64-unknown-linux-gnu.tar.gz")
+sha256sums_x86_64=('8e055071a4c270595906e0fa91f2d70813cc1f3350671db8e45c3322289be8c6')
+sha256sums_aarch64=('7718d6b1f3234ce0051ba181ba5a349c39bceb95ec08cd77fe25d0731e82a0da')
+
+package() {
+  cd "omavn-$CARCH-unknown-linux-gnu"
+  install -Dm755 omavn "$pkgdir/usr/bin/omavn"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+
+  ./omavn completions bash | install -Dm644 /dev/stdin "$pkgdir/usr/share/bash-completion/completions/omavn"
+  ./omavn completions zsh | install -Dm644 /dev/stdin "$pkgdir/usr/share/zsh/site-functions/_omavn"
+  ./omavn completions fish | install -Dm644 /dev/stdin "$pkgdir/usr/share/fish/vendor_completions.d/omavn.fish"
+}

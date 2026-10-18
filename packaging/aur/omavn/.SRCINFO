@@ -1,0 +1,22 @@
+pkgbase = omavn
+	pkgdesc = Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest
+	pkgver = 0.6.0
+	pkgrel = 1
+	url = https://omavn.dev
+	arch = x86_64
+	arch = aarch64
+	license = Apache-2.0
+	makedepends = cargo
+	depends = glibc
+	depends = libgcc
+	depends = libstdc++
+	depends = umu-launcher
+	optdepends = gamescope: scale fixed-resolution games correctly under tiling window managers
+	optdepends = libarchive: unpack ISO disc images (bsdtar)
+	optdepends = lib32-vulkan-icd-loader: render 32-bit games (most VNs) through DXVK
+	options = !debug
+	options = !lto
+	source = omavn-0.6.0.tar.gz::https://github.com/Tetraslam/omavn/archive/refs/tags/v0.6.0.tar.gz
+	sha256sums = b5a4bf74e345f8e58b2c59e4a1d22d35dbaf5a8cc54567a2b8de25f2f1cdc2ab
+
+pkgname = omavn

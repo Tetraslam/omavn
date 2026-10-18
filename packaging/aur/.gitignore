@@ -1,0 +1,7 @@
+*.pkg.tar.zst
+*.tar.gz
+*.log
+src/
+pkg/
+omavn-*/
+!omavn-bin/

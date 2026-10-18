@@ -59,4 +59,9 @@ It writes `results.jsonl`, `results.md`, and `sheet.png`, a contact sheet of eve
 
 ## Releases
 
-Tagging `vX.Y.Z` on `master` builds x86_64 and aarch64 binaries and publishes a GitHub release, which `omavn self update` and the install script pick up.
+Tagging `vX.Y.Z` on `master` builds x86_64 and aarch64 binaries and publishes a GitHub release, which `omavn self update` and the install script pick up. Then update the AUR packages (`omavn-bin` for the release binary, `omavn` from source):
+
+```bash
+packaging/aur/bump.sh X.Y.Z     # pkgver, checksums, .SRCINFO
+packaging/aur/publish.sh        # push to aur.archlinux.org
+```
