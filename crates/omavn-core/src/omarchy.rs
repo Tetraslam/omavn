@@ -166,6 +166,9 @@ fn keybinding_free() -> bool {
             && b["key"]
                 .as_str()
                 .is_some_and(|k| k.eq_ignore_ascii_case("v"))
+            // Lua binds report a function id as `arg`, so recognize ours by
+            // the description we give it.
+            && b["description"] != "Visual novels"
             && !b["arg"].as_str().unwrap_or("").contains("omavn")
     })
 }

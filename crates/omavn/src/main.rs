@@ -700,7 +700,7 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                     for c in &changes {
                         ui.success(c);
                     }
-                    ui.line("open your library from the Omarchy menu (Visual Novels) press Super+Shift+V, or run: omavn gui");
+                    ui.line("open your library with Super+Shift+V, Visual Novels in the Omarchy menu, or omavn gui");
                 });
             }
             OmarchyCmd::Remove => {
