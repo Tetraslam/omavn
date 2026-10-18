@@ -50,7 +50,7 @@ pub fn refresh(
 
 const ICON_SVG: &str = include_str!("../assets/omavn.svg");
 
-/// The "Visual Novels" app launcher entry that opens `omavn library`.
+/// The "Visual Novels" app launcher entry that opens `omavn gui`.
 pub fn write_library_entry() -> Result<()> {
     let Some(apps) = applications_dir() else {
         return Ok(());
@@ -64,7 +64,7 @@ pub fn write_library_entry() -> Result<()> {
          Type=Application\n\
          Name=Visual Novels\n\
          Comment=Your visual novel library\n\
-         Exec=\"{exe}\" library\n\
+         Exec=\"{exe}\" gui\n\
          Icon=omavn\n\
          Terminal=false\n\
          Categories=Game;\n\

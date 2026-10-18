@@ -169,6 +169,8 @@ fn finish(
         notes: entry.as_ref().and_then(|e| e.notes.clone()),
         source: fs::canonicalize(&opts.source).unwrap_or_else(|_| opts.source.clone()),
         installed_at: time::OffsetDateTime::now_utc(),
+        last_played: None,
+        playtime_secs: 0,
     };
     game.save(paths)?;
     let verbs = entry

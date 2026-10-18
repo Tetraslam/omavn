@@ -17,7 +17,12 @@ omavn --json list | jq -r '.[].id'
 omavn --json run dies-irae --print   # the exact program, argv, env, cwd
 ```
 
-Nothing prompts in JSON mode or without a terminal. `remove` needs `--yes`.
+Nothing prompts in JSON mode or without a terminal: commands that would ask (`run` or `remove` without a game, `remove` without `--yes`) fail with a message instead. Only `omavn gui` ever opens a window, and only because you asked for it.
+
+```bash
+omavn --json list dies --sort recent -n 5   # search
+omavn --json                                # summary: count and recent games
+```
 
 ## Docs as text
 

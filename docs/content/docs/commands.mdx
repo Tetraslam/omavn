@@ -3,7 +3,7 @@ title: Commands
 description: Every omavn command. Add --json to any of them for machine-readable output.
 ---
 
-Run `omavn` on its own to see your library and what to do next.
+Run `omavn` on its own for a short summary: how many games, the five you played most recently, and what to do next.
 
 ## install
 
@@ -22,10 +22,10 @@ Unpacks, installs, and registers a game, then fetches its VNDB metadata and art.
 ## run
 
 ```bash
-omavn run <game> [--target ID] [--window | --gamescope] [-v] [--detach] [--print] [-- args...]
+omavn run [game] [--target ID] [--window | --gamescope] [-v] [--detach] [--print] [-- args...]
 ```
 
-Launches a game. Alias: `play`. Ids, prefixes, and title fragments all work.
+Launches a game. Alias: `play`. Ids, prefixes, and title fragments all work. Without a game, you get a fuzzy picker in the terminal (most recently played first); with no terminal, omavn errors instead of guessing.
 
 - `--target` picks another entry point, like a different edition or a config tool (`omavn info` lists them)
 - `--window` / `--gamescope` override the display mode once (see [display](/docs/how-it-works#5-display))
@@ -33,22 +33,31 @@ Launches a game. Alias: `play`. Ids, prefixes, and title fragments all work.
 - `--print` shows the exact command instead of running it
 - `--detach` returns right away
 
-## library
+## list
 
 ```bash
-omavn library
+omavn list                      # most recently played first
+omavn list dies                 # filter: every word must match id, title, or engine
+omavn list --sort title -n 20   # recent | title | installed, at most 20
 ```
 
-Pick a game from your library and play it. On Omarchy this is a full-screen cover grid; elsewhere a numbered list. Alias: `pick`.
+Plain output, never interactive. Each line shows when you last played and for how long. Alias: `ls`.
 
-## list, info
+## gui
 
 ```bash
-omavn list
+omavn gui
+```
+
+Opens the graphical library and plays your pick: on Omarchy, a full-screen cover grid (also on Super+Shift+V and in the menu). Desktops without a graphical picker get an error pointing at `omavn run`, never a surprise window. Alias: `launcher`.
+
+## info
+
+```bash
 omavn info <game>
 ```
 
-`info` shows the engine, runner, file and prefix paths, entry points, and notes.
+Shows the engine, runner, file and prefix paths, entry points, and notes.
 
 ## set
 
@@ -74,8 +83,8 @@ Refreshes metadata, art, the library card, and the app launcher entry.
 ## remove
 
 ```bash
-omavn remove <game> [--yes]
-omavn remove --pick
+omavn remove [game] [--yes]     # no game: pick in the terminal
+omavn remove --pick             # pick from an Omarchy menu
 ```
 
 Deletes the game, its prefix, its saves (see `omavn saves` first), and its launcher entry. Asks first unless you pass `--yes`. Alias: `rm`.

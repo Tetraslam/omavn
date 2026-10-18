@@ -6,7 +6,7 @@
 
 <p align="center">Play visual novels on Linux. Point it at whatever you downloaded and it figures out the rest.</p>
 
-<p align="center"><a href="https://omavn.dev">omavn.dev</a> · <a href="https://omavn.dev/docs">Docs</a> · <a href="https://omavn.dev/llms.txt">llms.txt</a></p>
+<p align="center"><a href="https://omavn.dev">omavn.dev</a> (<a href="https://omavn.vercel.app">mirror</a>) · <a href="https://omavn.dev/docs">Docs</a> · <a href="https://omavn.dev/llms.txt">llms.txt</a></p>
 
 ```bash
 curl -fsSL https://omavn.dev/install.sh | sh
@@ -24,9 +24,9 @@ On [Omarchy](https://omarchy.org), `omavn omarchy setup` adds Visual Novels to t
 | Command | |
 | --- | --- |
 | `omavn install <download>` | unpack, install, and add a game |
-| `omavn run <game>` | play (`--target` for other editions or config tools) |
-| `omavn library` | pick from your library and play |
-| `omavn list` / `info <game>` | what's installed, and where |
+| `omavn run [game]` | play; without a game, pick from a list (`--target` for other editions) |
+| `omavn gui` | the graphical library (cover grid on Omarchy) |
+| `omavn list [words]` / `info <game>` | what's installed, and where |
 | `omavn set <game> <key> <value>` | display mode, default target, env vars |
 | `omavn exec <game> -- winecfg` | run something in a game's prefix |
 | `omavn self update` | update omavn |

@@ -73,6 +73,19 @@ pub struct Game {
     pub source: PathBuf,
     #[serde(with = "time::serde::rfc3339")]
     pub installed_at: time::OffsetDateTime,
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_played: Option<time::OffsetDateTime>,
+    /// Total seconds played through `omavn run` (detached runs aren't counted).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub playtime_secs: u64,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
 }
 
 impl Game {
@@ -111,6 +124,11 @@ impl Game {
         })
     }
 
+    /// When the game was last played, or installed if never.
+    pub fn last_activity(&self) -> time::OffsetDateTime {
+        self.last_played.unwrap_or(self.installed_at)
+    }
+
     pub fn save(&self, paths: &Paths) -> Result<()> {
         let dir = self.dir(paths);
         fs::create_dir_all(&dir)?;
@@ -142,6 +160,42 @@ pub fn list(paths: &Paths) -> Result<Vec<Game>> {
         }
     }
     games.sort_by_cached_key(|g| g.title.to_lowercase());
+    Ok(games)
+}
+
+/// How `list` orders games.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Sort {
+    /// Most recently played (or installed) first.
+    #[default]
+    Recent,
+    Title,
+    Installed,
+}
+
+/// Games matching `query` (id, title, original title, or engine; all words
+/// must match, case-insensitive), sorted.
+pub fn search(paths: &Paths, query: &str, sort: Sort) -> Result<Vec<Game>> {
+    let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).collect();
+    let mut games: Vec<Game> = list(paths)?
+        .into_iter()
+        .filter(|g| {
+            let hay = format!(
+                "{} {} {} {}",
+                g.id,
+                g.title,
+                g.original_title.as_deref().unwrap_or(""),
+                g.engine.name()
+            )
+            .to_lowercase();
+            words.iter().all(|w| hay.contains(w))
+        })
+        .collect();
+    match sort {
+        Sort::Recent => games.sort_by_key(|g| std::cmp::Reverse(g.last_activity())),
+        Sort::Installed => games.sort_by_key(|g| std::cmp::Reverse(g.installed_at)),
+        Sort::Title => {}
+    }
     Ok(games)
 }
 

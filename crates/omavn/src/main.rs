@@ -52,8 +52,8 @@ enum Cmd {
     /// Launch an installed game.
     #[command(visible_alias = "play")]
     Run {
-        /// Game id or part of its title.
-        game: String,
+        /// Game id or part of its title. Omit it to pick from a list (needs a terminal).
+        game: Option<String>,
         /// Which entry point (see `omavn info`), e.g. a config tool or another edition.
         #[arg(short, long)]
         target: Option<String>,
@@ -76,12 +76,20 @@ enum Cmd {
         #[arg(last = true)]
         args: Vec<OsString>,
     },
-    /// List installed games.
+    /// List installed games, most recently played first. Never interactive.
     #[command(visible_alias = "ls")]
-    List,
-    /// Pick a game from a cover-art grid and play it (Omarchy's picker, or a text menu).
-    #[command(visible_alias = "pick")]
-    Library,
+    List {
+        /// Only games whose id, title, or engine contain all of these words.
+        query: Vec<String>,
+        #[arg(long, value_enum, default_value = "recent")]
+        sort: SortBy,
+        /// Show at most this many.
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
+    },
+    /// Open the graphical library (a cover grid on Omarchy) and play the pick.
+    #[command(visible_alias = "launcher", alias = "library")]
+    Gui,
     /// Refresh a game's VNDB metadata, art, and launcher entry.
     Meta {
         /// Game id or title; omit with --all.
@@ -106,7 +114,7 @@ enum Cmd {
     /// Uninstall a game, including its saves.
     #[command(visible_alias = "rm")]
     Remove {
-        #[arg(required_unless_present = "pick")]
+        /// Omit to pick from a list (needs a terminal).
         game: Option<String>,
         /// Choose the game from a menu (Omarchy).
         #[arg(long)]
@@ -189,6 +197,13 @@ enum RuntimeCmd {
         /// Ren'Py version (for `renpy`).
         version: Option<String>,
     },
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum SortBy {
+    Recent,
+    Title,
+    Installed,
 }
 
 #[derive(Subcommand)]
@@ -303,7 +318,13 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             gamescope,
             args,
         } => {
-            let game = library::find(&paths, &game)?;
+            let mut game = match game {
+                Some(g) => library::find(&paths, &g)?,
+                None => match pick_in_terminal(&paths, "Play")? {
+                    Some(g) => g,
+                    None => return Ok(ExitCode::SUCCESS),
+                },
+            };
             let display = match (window, gamescope) {
                 (true, _) => Some(Display::Window),
                 (_, true) => Some(Display::Gamescope),
@@ -354,6 +375,8 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             }
             let started = std::time::Instant::now();
             let status = child.wait()?;
+            game.playtime_secs += started.elapsed().as_secs();
+            let _ = game.save(&paths);
             if headless && !status.success() && started.elapsed().as_secs() < 15 {
                 let log_s = log.display().to_string();
                 omavn_core::omarchy::notify(
@@ -374,7 +397,7 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 status.code().unwrap_or(1).clamp(0, 255) as u8
             ));
         }
-        Cmd::Library => return library_picker(&paths, ui),
+        Cmd::Gui => return gui(&paths, ui),
         Cmd::Meta { game, vndb, all } => {
             let mut games = if all {
                 library::list(&paths)?
@@ -397,19 +420,45 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             game.save(&paths)?;
             ui.result(&game, || ui.success(&format!("{}: {key} updated", game.id)));
         }
-        Cmd::List => {
-            let games = library::list(&paths)?;
+        Cmd::List { query, sort, limit } => {
+            let sort = match sort {
+                SortBy::Recent => library::Sort::Recent,
+                SortBy::Title => library::Sort::Title,
+                SortBy::Installed => library::Sort::Installed,
+            };
+            let mut games = library::search(&paths, &query.join(" "), sort)?;
+            let total = games.len();
+            if let Some(n) = limit {
+                games.truncate(n);
+            }
             ui.result(&games, || {
-                if games.is_empty() {
-                    ui.line("no games yet. install one with: omavn install <download>");
+                if total == 0 {
+                    if query.is_empty() {
+                        ui.line("no games yet. install one with: omavn install <download>");
+                    } else {
+                        ui.line(&format!("no games match `{}`", query.join(" ")));
+                    }
+                    return;
                 }
+                let w = games
+                    .iter()
+                    .map(|g| g.id.chars().count())
+                    .max()
+                    .unwrap_or(0)
+                    .min(32);
                 for g in &games {
                     ui.line(&format!(
-                        "{:<24} {}  {}",
+                        "{:<w$}  {}  {}",
                         g.id,
                         g.title,
-                        ui.dim(&format!("({})", g.engine.name()))
+                        ui.dim(&played(g))
                     ));
+                }
+                if games.len() < total {
+                    ui.line(&ui.dim(&format!(
+                        "{} of {total}; see all with --limit {total}",
+                        games.len()
+                    )));
                 }
             });
         }
@@ -456,7 +505,10 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                     Some(g) => g,
                     None => return Ok(ExitCode::SUCCESS),
                 },
-                None => bail!("which game?"),
+                None => match pick_in_terminal(&paths, "Remove")? {
+                    Some(g) => g,
+                    None => return Ok(ExitCode::SUCCESS),
+                },
             };
             let dir = game.dir(&paths);
             if !yes
@@ -648,7 +700,7 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                     for c in &changes {
                         ui.success(c);
                     }
-                    ui.line("open your library from the Omarchy menu (Visual Novels) or run: omavn library");
+                    ui.line("open your library from the Omarchy menu (Visual Novels) press Super+Shift+V, or run: omavn gui");
                 });
             }
             OmarchyCmd::Remove => {
@@ -748,11 +800,12 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `omavn` on its own: the library at a glance, or how to get started.
+/// `omavn` on its own: a summary that stays short with a big library.
 fn home(paths: &Paths, ui: &Ui, json: bool) -> Result<ExitCode> {
-    let games = library::list(paths)?;
+    let games = library::search(paths, "", library::Sort::Recent)?;
     if json {
-        ui.result(&games, || {});
+        let recent: Vec<&Game> = games.iter().take(5).collect();
+        ui.result(&serde_json::json!({ "version": env!("CARGO_PKG_VERSION"), "games": games.len(), "recent": recent }), || {});
         return Ok(ExitCode::SUCCESS);
     }
     ui.line(&format!(
@@ -767,13 +820,78 @@ fn home(paths: &Paths, ui: &Ui, json: bool) -> Result<ExitCode> {
             ui.line("\non Omarchy? omavn omarchy setup adds Visual Novels to your menu");
         }
     } else {
-        for g in &games {
-            ui.line(&format!("  {:<24} {}", g.id, g.title));
+        let n = games.len();
+        ui.line(&format!(
+            "{n} game{}{}",
+            if n == 1 { "" } else { "s" },
+            if n > 5 { ", recently played:" } else { ":" }
+        ));
+        let w = games
+            .iter()
+            .take(5)
+            .map(|g| g.id.chars().count())
+            .max()
+            .unwrap_or(0)
+            .min(32);
+        for g in games.iter().take(5) {
+            ui.line(&format!(
+                "  {:<w$}  {}  {}",
+                g.id,
+                g.title,
+                ui.dim(&played(g))
+            ));
         }
-        ui.line("\nplay one:  omavn run <id>    browse:  omavn library    add more:  omavn install <download>");
+        ui.line("\nplay:  omavn run [game]    find:  omavn list <words>    add:  omavn install <download>");
     }
-    ui.line(&ui.dim("\nall commands: omavn --help    docs: https://omavn.dev"));
+    ui.line(&ui.dim("all commands: omavn --help    docs: https://omavn.dev"));
     Ok(ExitCode::SUCCESS)
+}
+
+fn time_now() -> time::OffsetDateTime {
+    time::OffsetDateTime::now_utc()
+}
+
+/// "played 3d ago · 12h" / "not played yet".
+fn played(g: &Game) -> String {
+    let Some(last) = g.last_played else {
+        return "not played yet".into();
+    };
+    let ago = (time_now() - last).whole_seconds().max(0) as u64;
+    let rel = |s: u64| match s {
+        0..60 => "just now".to_string(),
+        60..3600 => format!("{}m ago", s / 60),
+        3600..86400 => format!("{}h ago", s / 3600),
+        _ => format!("{}d ago", s / 86400),
+    };
+    let total = match g.playtime_secs {
+        0 => String::new(),
+        s if s < 3600 => format!(" · {}m", s / 60),
+        s => format!(" · {}h", s / 3600),
+    };
+    format!("played {}{total}", rel(ago))
+}
+
+/// Fuzzy-pick a game in the terminal. Never opens a window; without a
+/// terminal it fails with a pointer to the non-interactive commands.
+fn pick_in_terminal(paths: &Paths, verb: &str) -> Result<Option<Game>> {
+    if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
+        bail!("no game given and no terminal to pick one in; pass one (see `omavn list`)");
+    }
+    let games = library::search(paths, "", library::Sort::Recent)?;
+    if games.is_empty() {
+        bail!("no games yet. install one with: omavn install <download>");
+    }
+    let items: Vec<String> = games
+        .iter()
+        .map(|g| format!("{}  ({})", g.title, g.id))
+        .collect();
+    let choice = dialoguer::FuzzySelect::new()
+        .with_prompt(format!("{verb} which? (type to filter)"))
+        .items(&items)
+        .default(0)
+        .max_length(15)
+        .interact_opt()?;
+    Ok(choice.map(|i| games[i].clone()))
 }
 
 /// Ask for a download with Omarchy's file menu. A file inside a subfolder
@@ -822,8 +940,14 @@ fn pick_game(paths: &Paths) -> Result<Option<Game>> {
     Ok(Some(library::load(paths, id)?))
 }
 
-/// Show the library as a cover grid (Omarchy) or a numbered list, then play the pick.
-fn library_picker(paths: &Paths, ui: &Ui) -> Result<ExitCode> {
+/// The graphical library: Omarchy's cover grid. Other desktops don't have
+/// one yet, so say so instead of silently falling back to something else.
+fn gui(paths: &Paths, ui: &Ui) -> Result<ExitCode> {
+    if runtime::which("omarchy-menu-images").is_none() {
+        bail!(
+            "no graphical library on this desktop yet (it uses Omarchy's picker); use `omavn run` to pick in the terminal"
+        );
+    }
     let games = library::list(paths)?;
     if games.is_empty() {
         bail!("no games yet. install one with: omavn install <download>");
@@ -834,31 +958,17 @@ fn library_picker(paths: &Paths, ui: &Ui) -> Result<ExitCode> {
     {
         let _ = omavn_core::art::render(paths, g);
     }
-    let picked = if runtime::which("omarchy-menu-images").is_some() {
-        let out = std::process::Command::new("omarchy-menu-images")
-            .args(["--show-labels", "--filterable", "--print-name"])
-            .arg(omavn_core::art::library_dir(paths))
-            .output()?;
-        let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if name.is_empty() {
-            return Ok(ExitCode::SUCCESS);
-        }
-        omavn_core::art::game_for_entry(paths, &name)
-            .with_context(|| format!("no game for library entry `{name}`"))?
-    } else {
-        for (i, g) in games.iter().enumerate() {
-            ui.line(&format!("{:>3}  {}", i + 1, g.title));
-        }
-        eprint!("play which? ");
-        let mut line = String::new();
-        std::io::stdin().read_line(&mut line)?;
-        let n: usize = line.trim().parse().context("not a number")?;
-        games
-            .get(n.wrapping_sub(1))
-            .context("no such game")?
-            .id
-            .clone()
-    };
+    let out = std::process::Command::new("omarchy-menu-images")
+        .args(["--show-labels", "--filterable", "--print-name"])
+        .arg(omavn_core::art::library_dir(paths))
+        .output()?;
+    let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if name.is_empty() {
+        return Ok(ExitCode::SUCCESS);
+    }
+    let picked = omavn_core::art::game_for_entry(paths, &name)
+        .with_context(|| format!("no game for library entry `{name}`"))?;
+    let _ = ui;
     let exe = std::env::current_exe()?;
     let status = std::process::Command::new(exe)
         .args(["run", &picked])

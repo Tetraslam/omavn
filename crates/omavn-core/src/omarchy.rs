@@ -174,7 +174,7 @@ fn rules_lua(bind: Option<&Path>) -> String {
     let bind = bind
         .map(|exe| {
             format!(
-                "\n-- Open your visual novel library.\no.bind(\"{KEYS}\", \"Visual novels\", o.launch(\"'{}' library\"))\n",
+                "\n-- Open your visual novel library.\no.bind(\"{KEYS}\", \"Visual novels\", o.launch(\"'{}' gui\"))\n",
                 exe.display()
             )
         })
@@ -211,7 +211,7 @@ fn menu_entries(omavn: &Path) -> Vec<(&'static str, String)> {
         (
             "visual-novels",
             format!(
-                r#"{{"icon":"󰂺","label":"Visual Novels","aliases":["vn","vns","omavn"],"description":"Your visual novel library","action":"'{exe}' library"}}"#
+                r#"{{"icon":"󰂺","label":"Visual Novels","aliases":["vn","vns","omavn"],"description":"Your visual novel library","action":"'{exe}' gui"}}"#
             ),
         ),
         (
@@ -233,14 +233,42 @@ fn menu_entries(omavn: &Path) -> Vec<(&'static str, String)> {
 /// formatting or comments.
 fn add_menu_entries(omavn: &Path) -> Result<bool> {
     let path = menu_file();
-    let text = fs::read_to_string(&path).unwrap_or_else(|_| "{\n}\n".into());
+    let original = fs::read_to_string(&path).unwrap_or_else(|_| "{\n}\n".into());
+    // Refresh entries an older omavn wrote (each sits on its own line).
+    let entries = menu_entries(omavn);
+    let mut text: String = original
+        .lines()
+        .map(|line| {
+            let current = entries
+                .iter()
+                .find(|(k, _)| line.trim_start().starts_with(&format!("\"{k}\":")));
+            match current {
+                Some((k, v)) => {
+                    let comma = if line.trim_end().ends_with(',') {
+                        ","
+                    } else {
+                        ""
+                    };
+                    format!("  \"{k}\": {v}{comma}")
+                }
+                None => line.to_string(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if original.ends_with('\n') {
+        text.push('\n');
+    }
+    if text != original {
+        fs::write(&path, &text)?;
+    }
     let missing: Vec<String> = menu_entries(omavn)
         .into_iter()
         .filter(|(k, _)| !text.contains(&format!("\"{k}\"")))
         .map(|(k, v)| format!("  \"{k}\": {v}"))
         .collect();
     if missing.is_empty() {
-        return Ok(false);
+        return Ok(text != original);
     }
     let close = last_significant(&text, |c| c == '}')
         .context("menu extension file is not a JSON object")?;
