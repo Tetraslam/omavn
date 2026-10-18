@@ -6,6 +6,7 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
+use omavn_core::library::{Display, Game};
 use omavn_core::{Paths, detect, feedback, install, launch, library, runtime};
 
 use crate::ui::Ui;
@@ -54,6 +55,15 @@ enum Cmd {
         /// Return immediately instead of waiting for the game to exit.
         #[arg(short, long)]
         detach: bool,
+        /// Show the runner's output instead of writing it to the game's log.
+        #[arg(short, long)]
+        verbose: bool,
+        /// Run in a plain window instead of gamescope, just this once.
+        #[arg(long, conflicts_with = "gamescope")]
+        window: bool,
+        /// Run inside gamescope, just this once.
+        #[arg(long)]
+        gamescope: bool,
         /// Extra arguments passed to the game.
         #[arg(last = true)]
         args: Vec<OsString>,
@@ -61,6 +71,14 @@ enum Cmd {
     /// List installed games.
     #[command(visible_alias = "ls")]
     List,
+    /// Change a game setting: display (auto|gamescope|window), target, title, env.NAME.
+    ///
+    /// Omit the value to reset it (for env.NAME, to remove the variable).
+    Set {
+        game: String,
+        key: String,
+        value: Option<String>,
+    },
     /// Show details about an installed game.
     Info { game: String },
     /// Uninstall a game, including its saves.
@@ -176,29 +194,62 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             target,
             print,
             detach,
+            verbose,
+            window,
+            gamescope,
             args,
         } => {
             let game = library::find(&paths, &game)?;
-            let spec = launch::game(&paths, &game, target.as_deref(), &args, ui)?;
+            let display = match (window, gamescope) {
+                (true, _) => Some(Display::Window),
+                (_, true) => Some(Display::Gamescope),
+                _ => None,
+            };
+            let opts = launch::Options {
+                target,
+                args,
+                display,
+            };
+            let spec = launch::game(&paths, &game, &opts, ui)?;
             ui.finish_progress();
             if print {
                 ui.result(&spec, || ui.line(&shell_line(&spec)));
                 return Ok(ExitCode::SUCCESS);
             }
-            let mut child = spec
-                .command()
+            let mut cmd = spec.command();
+            let log = game.log_file(&paths);
+            if !verbose {
+                let file = std::fs::File::create(&log)?;
+                cmd.stdout(file.try_clone()?)
+                    .stderr(file)
+                    .stdin(std::process::Stdio::null());
+            }
+            let mut child = cmd
                 .spawn()
                 .with_context(|| format!("starting {}", spec.program.display()))?;
             if detach {
-                ui.result(&serde_json::json!({ "pid": child.id() }), || {
-                    ui.success(&format!("started {} (pid {})", game.title, child.id()))
-                });
+                ui.result(
+                    &serde_json::json!({ "pid": child.id(), "log": log }),
+                    || ui.success(&format!("started {} (pid {})", game.title, child.id())),
+                );
                 return Ok(ExitCode::SUCCESS);
             }
+            if !verbose && !cli.json {
+                ui.line(&format!("▶ {}", game.title));
+            }
             let status = child.wait()?;
+            if !status.success() && !verbose {
+                ui.line(&ui.dim(&format!("exited with {status}; log: {}", log.display())));
+            }
             return Ok(ExitCode::from(
                 status.code().unwrap_or(1).clamp(0, 255) as u8
             ));
+        }
+        Cmd::Set { game, key, value } => {
+            let mut game = library::find(&paths, &game)?;
+            set(&mut game, &key, value.as_deref())?;
+            game.save(&paths)?;
+            ui.result(&game, || ui.success(&format!("{}: {key} updated", game.id)));
         }
         Cmd::List => {
             let games = library::list(&paths)?;
@@ -272,7 +323,14 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
         Cmd::Exec { game, command } => {
             let game = library::find(&paths, &game)?;
             let files = game.files_dir(&paths);
-            let spec = launch::proton_spec(&paths, &game.prefix(&paths), command, files, ui)?;
+            let spec = launch::proton_spec(
+                &paths,
+                &game.prefix(&paths),
+                &game.umu_id(),
+                command,
+                files,
+                ui,
+            )?;
             ui.finish_progress();
             let status = spec.command().status()?;
             return Ok(ExitCode::from(
@@ -406,6 +464,34 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+fn set(game: &mut Game, key: &str, value: Option<&str>) -> Result<()> {
+    match (key, value) {
+        ("display", v) => {
+            game.display = match v.unwrap_or("auto") {
+                "auto" => Display::Auto,
+                "gamescope" => Display::Gamescope,
+                "window" => Display::Window,
+                other => bail!("display must be auto, gamescope, or window (got `{other}`)"),
+            }
+        }
+        ("target" | "default-target", Some(v)) => {
+            game.target(Some(v))?;
+            game.default_target = v.to_string();
+        }
+        ("title", Some(v)) => game.title = v.to_string(),
+        (k, v) if k.starts_with("env.") => {
+            let name = &k[4..];
+            match v {
+                Some(v) => game.env.insert(name.to_string(), v.to_string()),
+                None => game.env.remove(name),
+            };
+        }
+        (k, None) => bail!("`{k}` needs a value"),
+        (k, _) => bail!("unknown setting `{k}` (display, target, title, env.NAME)"),
+    }
+    Ok(())
+}
+
 #[derive(serde::Serialize)]
 struct Check {
     name: String,
@@ -450,6 +536,18 @@ fn doctor(paths: &Paths) -> Vec<Check> {
         true,
         py.map(|p| p.display().to_string())
             .unwrap_or("needed by umu-launcher".into()),
+    );
+    let gamescope = runtime::which("gamescope");
+    add(
+        "gamescope",
+        gamescope.is_some(),
+        false,
+        if gamescope.is_some() {
+            "Windows games run scaled to fill the screen".into()
+        } else {
+            "not installed; fixed-resolution games may be stretched by tiling window managers"
+                .into()
+        },
     );
     let display = std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok();
     add(

@@ -7,10 +7,10 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
-use crate::library::{Game, Runner};
+use crate::library::{Display, Game, Runner};
 use crate::paths::Paths;
 use crate::report::Reporter;
-use crate::runtime;
+use crate::{desktop, runtime};
 
 /// Everything needed to start a process. Serializable so frontends and
 /// agents can inspect (`omavn run --print`) or run it themselves.
@@ -38,18 +38,22 @@ impl Spec {
     }
 }
 
-pub fn game(
-    paths: &Paths,
-    game: &Game,
-    target: Option<&str>,
-    extra: &[OsString],
-    reporter: &dyn Reporter,
-) -> Result<Spec> {
-    let target = game.target(target)?;
+#[derive(Debug, Clone, Default)]
+pub struct Options {
+    /// Entry point id; the game's default when `None`.
+    pub target: Option<String>,
+    /// Extra arguments for the game.
+    pub args: Vec<OsString>,
+    /// Overrides the game's display setting.
+    pub display: Option<Display>,
+}
+
+pub fn game(paths: &Paths, game: &Game, opts: &Options, reporter: &dyn Reporter) -> Result<Spec> {
+    let target = game.target(opts.target.as_deref())?;
     let files = game.files_dir(paths);
     let exe = files.join(&target.exe);
     let mut args: Vec<OsString> = target.args.iter().map(OsString::from).collect();
-    args.extend(extra.iter().cloned());
+    args.extend(opts.args.iter().cloned());
 
     let mut spec = match game.runner {
         Runner::NativeRenpy => {
@@ -72,17 +76,71 @@ pub fn game(
             let cwd = exe.parent().unwrap_or(&files).to_path_buf();
             let mut full = vec![exe.into_os_string()];
             full.extend(args);
-            proton_spec(paths, &game.prefix(paths), full, cwd, reporter)?
+            let spec = proton_spec(
+                paths,
+                &game.prefix(paths),
+                &game.umu_id(),
+                full,
+                cwd,
+                reporter,
+            )?;
+            match resolve_display(opts.display.unwrap_or(game.display)) {
+                Display::Gamescope => gamescope(spec)?,
+                _ => spec,
+            }
         }
     };
     spec.env.extend(game.env.clone());
     Ok(spec)
 }
 
+/// `Auto` becomes gamescope when it is installed and there is a display to
+/// nest in. `OMAVN_DISPLAY=window|gamescope` overrides everything.
+fn resolve_display(display: Display) -> Display {
+    match std::env::var("OMAVN_DISPLAY").as_deref() {
+        Ok("window") => return Display::Window,
+        Ok("gamescope") => return Display::Gamescope,
+        _ => {}
+    }
+    match display {
+        Display::Auto if runtime::which("gamescope").is_some() && desktop::has_display() => {
+            Display::Gamescope
+        }
+        Display::Auto => Display::Window,
+        other => other,
+    }
+}
+
+/// Wrap `inner` in a fullscreen gamescope at the focused monitor's native
+/// resolution, scaled to fit with the aspect ratio kept.
+fn gamescope(inner: Spec) -> Result<Spec> {
+    let program = runtime::which("gamescope").context("gamescope is not installed")?;
+    let mut args: Vec<OsString> = Vec::new();
+    if let Some((w, h)) = desktop::focused_output_size() {
+        for (flag, v) in [("-W", w), ("-H", h)] {
+            args.push(flag.into());
+            args.push(v.to_string().into());
+        }
+    }
+    for a in ["-f", "-S", "fit", "--"] {
+        args.push(a.into());
+    }
+    args.push(inner.program.into_os_string());
+    args.extend(inner.args);
+    Ok(Spec {
+        program,
+        arg0: None,
+        args,
+        env: inner.env,
+        cwd: inner.cwd,
+    })
+}
+
 /// Run an arbitrary Windows program (or wine tool like `winecfg`) in `prefix`.
 pub fn proton_spec(
     paths: &Paths,
     prefix: &Path,
+    umu_id: &str,
     args: Vec<OsString>,
     cwd: PathBuf,
     reporter: &dyn Reporter,
@@ -93,7 +151,7 @@ pub fn proton_spec(
     let env = BTreeMap::from([
         ("WINEPREFIX".into(), prefix.display().to_string()),
         ("PROTONPATH".into(), proton.path.display().to_string()),
-        ("GAMEID".into(), "umu-default".into()),
+        ("GAMEID".into(), umu_id.into()),
         ("STORE".into(), "none".into()),
     ]);
     Ok(Spec {

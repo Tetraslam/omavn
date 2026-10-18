@@ -14,7 +14,7 @@ use crate::catalog;
 use crate::detect::{self, Engine, InstallerKind, Payload};
 use crate::ingest;
 use crate::launch;
-use crate::library::{self, Game, Runner};
+use crate::library::{self, Display, Game, Runner};
 use crate::paths::Paths;
 use crate::report::Reporter;
 use crate::runtime;
@@ -140,6 +140,7 @@ fn finish(
         title,
         engine: entry.as_ref().and_then(|e| e.engine).unwrap_or(engine),
         runner,
+        display: Display::Auto,
         files: files_rel,
         default_target,
         targets,
@@ -193,7 +194,7 @@ fn run_installer(
         }
     }
     let cwd = exe.parent().unwrap_or(Path::new("/")).to_path_buf();
-    let spec = launch::proton_spec(paths, &prefix, args, cwd, reporter)?;
+    let spec = launch::proton_spec(paths, &prefix, &library::umu_id(id), args, cwd, reporter)?;
     let started = time::OffsetDateTime::now_utc().unix_timestamp();
     let mut child = spec.command().spawn().context("starting umu-run")?;
     let status = loop {

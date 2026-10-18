@@ -8,6 +8,7 @@
 
 pub mod archive;
 pub mod catalog;
+pub mod desktop;
 pub mod detect;
 pub mod download;
 pub mod feedback;

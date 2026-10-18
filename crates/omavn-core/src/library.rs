@@ -21,12 +21,34 @@ pub enum Runner {
     NativeRenpy,
 }
 
+/// How a Windows game's window is presented.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Display {
+    /// gamescope when it is installed, a plain window otherwise.
+    #[default]
+    Auto,
+    /// Inside gamescope: scaled to fill the screen, input mapped to match.
+    /// Fixes fixed-resolution games stretched by tiling window managers.
+    Gamescope,
+    /// A plain window, managed by the desktop.
+    Window,
+}
+
+impl Display {
+    fn is_auto(&self) -> bool {
+        *self == Self::Auto
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Game {
     pub id: String,
     pub title: String,
     pub engine: Engine,
     pub runner: Runner,
+    #[serde(default, skip_serializing_if = "Display::is_auto")]
+    pub display: Display,
     /// Game files. Relative paths are relative to the game's directory.
     pub files: PathBuf,
     pub default_target: String,
@@ -56,6 +78,17 @@ impl Game {
 
     pub fn prefix(&self, paths: &Paths) -> PathBuf {
         self.dir(paths).join("prefix")
+    }
+
+    pub fn log_file(&self, paths: &Paths) -> PathBuf {
+        self.dir(paths).join("last-run.log")
+    }
+
+    /// umu game id. Proton turns `umu-<x>` into the X11 window class
+    /// `steam_app_<x>`, which lets window rules target omavn games
+    /// (`^steam_app_omavn_`). Hyphens break that mapping, so they become `_`.
+    pub fn umu_id(&self) -> String {
+        umu_id(&self.id)
     }
 
     pub fn target(&self, id: Option<&str>) -> Result<&Target> {
@@ -124,6 +157,10 @@ pub fn find(paths: &Paths, query: &str) -> Result<Game> {
             bail!("`{query}` is ambiguous: {}", ids.join(", "))
         }
     }
+}
+
+pub fn umu_id(id: &str) -> String {
+    format!("umu-omavn_{}", id.replace('-', "_"))
 }
 
 /// A fresh id based on `base` that is not taken yet.
