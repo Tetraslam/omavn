@@ -18,6 +18,8 @@ pub enum Kind {
     Zip,
     Rar,
     SevenZip,
+    /// ISO 9660 disc image.
+    Iso,
 }
 
 /// An archive made of one or more files on disk, in volume order.
@@ -61,6 +63,9 @@ pub fn sniff(path: &Path) -> Option<Kind> {
     if head.starts_with(RAR4_SIG) || head.starts_with(RAR5_SIG) {
         return Some(Kind::Rar);
     }
+    if is_iso(&mut f) {
+        return Some(Kind::Iso);
+    }
     if head.starts_with(SEVENZ_SIG) {
         return Some(Kind::SevenZip);
     }
@@ -68,6 +73,14 @@ pub fn sniff(path: &Path) -> Option<Kind> {
         return Some(Kind::Rar);
     }
     None
+}
+
+/// ISO 9660 puts `CD001` in the first volume descriptor, at 0x8001.
+fn is_iso(f: &mut File) -> bool {
+    let mut magic = [0u8; 5];
+    f.seek(SeekFrom::Start(0x8001)).is_ok()
+        && f.read_exact(&mut magic).is_ok()
+        && &magic == b"CD001"
 }
 
 fn is_rar_sfx(path: &Path) -> bool {
@@ -183,7 +196,9 @@ pub fn group(files: &[PathBuf]) -> Vec<ArchiveSet> {
             continue;
         }
 
-        let by_ext = name.ends_with(".zip") || name.ends_with(".7z") || name.ends_with(".exe");
+        let by_ext = [".zip", ".7z", ".exe", ".iso"]
+            .iter()
+            .any(|e| name.ends_with(e));
         if by_ext && let Some(kind) = sniff(file) {
             claimed.insert(file.clone());
             sets.push(ArchiveSet {
@@ -221,6 +236,7 @@ pub fn extract(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result
         Kind::Zip => extract_zip(set, dest, reporter),
         Kind::Rar => extract_rar(set, dest, reporter),
         Kind::SevenZip => extract_7z(set, dest, reporter),
+        Kind::Iso => extract_iso(set, dest, reporter),
     }
     .with_context(|| format!("extracting {}", set.first().display()))
 }
@@ -396,6 +412,31 @@ fn extract_7z(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result<
         Ok(true)
     })?;
     Ok(done)
+}
+
+/// Disc images go through libarchive's bsdtar, present on most systems.
+fn extract_iso(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result<u64> {
+    let bsdtar = crate::runtime::which("bsdtar")
+        .context("disc images need bsdtar (libarchive); install it with your package manager")?;
+    reporter.progress(0, 0);
+    let status = std::process::Command::new(bsdtar)
+        .arg("-xf")
+        .arg(set.first())
+        .arg("-C")
+        .arg(dest)
+        .status()?;
+    if !status.success() {
+        bail!("bsdtar failed ({status})");
+    }
+    // Discs mark everything read-only; installers and saves need to write.
+    for entry in walkdir::WalkDir::new(dest).into_iter().flatten() {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(m) = entry.metadata() {
+            let mode = m.permissions().mode() | 0o200;
+            let _ = fs::set_permissions(entry.path(), fs::Permissions::from_mode(mode));
+        }
+    }
+    Ok(set.total_size())
 }
 
 /// Metadata that archivers (mostly macOS Finder) sneak in.

@@ -8,6 +8,7 @@ description: What happens between "omavn install" and the title screen.
 Downloads come wrapped in layers. Dies irae from JAST is three zips, each holding one volume of a split RAR whose first volume is a self-extracting `.exe`. omavn peels layers until it reaches something playable:
 
 - groups multi-volume sets (`.part1.exe`/`.part2.rar`, `.rar`/`.r00`, `.7z.001`)
+- opens ISO disc images (via `bsdtar`)
 - detects RAR self-extractors by content, not name
 - decodes Shift-JIS file names in zips, which most Japanese releases use
 - drops `__MACOSX` and other packer junk
