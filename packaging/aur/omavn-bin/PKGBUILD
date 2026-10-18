@@ -1,6 +1,6 @@
 # Maintainer: Shresht Bhowmick <bhowmickshresht@gmail.com>
 pkgname=omavn-bin
-pkgver=0.6.1
+pkgver=0.6.2
 pkgrel=1
 pkgdesc="Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest"
 arch=('x86_64' 'aarch64')
@@ -19,8 +19,8 @@ conflicts=('omavn')
 # under pacman it refuses (the binary isn't user-writable), as it should.
 source_x86_64=("$pkgname-$pkgver-x86_64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-x86_64-unknown-linux-gnu.tar.gz")
 source_aarch64=("$pkgname-$pkgver-aarch64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v$pkgver/omavn-aarch64-unknown-linux-gnu.tar.gz")
-sha256sums_x86_64=('36bdcb396cc7dcf4fb19af2c5e20e9963de7924b7a225680bd307280f28e316a')
-sha256sums_aarch64=('8cce0a7d6238aed744480c72c923e9130166c327b150558153f0c15326d0f661')
+sha256sums_x86_64=('efc736aa58601affd6004bec373519d2f79e58251c6a2e597812dc6bf607f38f')
+sha256sums_aarch64=('1ae874381d0cb28db945b2cd90cbfb748851c45617e9a2fdae48c90174925cff')
 
 package() {
   cd "omavn-$CARCH-unknown-linux-gnu"
