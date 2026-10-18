@@ -6,7 +6,7 @@
 
 <p align="center">Play visual novels on Linux. Point it at whatever you downloaded and it figures out the rest.</p>
 
-<p align="center"><a href="https://omavn.dev">omavn.dev</a> (<a href="https://omavn.vercel.app">mirror</a>) · <a href="https://omavn.dev/docs">Docs</a> · <a href="https://omavn.dev/llms.txt">llms.txt</a></p>
+<p align="center"><a href="https://omavn.dev">omavn.dev</a> (<a href="https://omavn-liart.vercel.app">mirror</a>) · <a href="https://omavn.dev/docs">Docs</a> · <a href="https://omavn.dev/llms.txt">llms.txt</a></p>
 
 ```bash
 curl -fsSL https://omavn.dev/install.sh | sh
