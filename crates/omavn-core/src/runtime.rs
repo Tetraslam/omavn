@@ -111,13 +111,12 @@ pub fn install_ge_proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proto
     let release = download::github_latest("GloriousEggroll/proton-ge-custom")?;
     let tag = &release.tag_name;
     let dest_root = paths.runtimes().join("proton");
-    let dest = dest_root.join(tag);
-    if dest.join("proton").is_file() {
-        return Ok(Proton {
-            name: tag.clone(),
-            path: dest,
-            managed: true,
-        });
+    // Release tarballs unpack to e.g. `GE-Proton11-9-x86_64`, not the bare tag.
+    if let Some(existing) = find_protons(paths)
+        .into_iter()
+        .find(|p| p.managed && p.name.starts_with(tag.as_str()))
+    {
+        return Ok(existing);
     }
     let asset = |suffix: &str| {
         release
@@ -142,11 +141,19 @@ pub fn install_ge_proton(paths: &Paths, reporter: &dyn Reporter) -> Result<Proto
     fs::create_dir_all(&tmp)?;
     let gz = flate2::read::GzDecoder::new(BufReader::new(File::open(&file)?));
     tar::Archive::new(gz).unpack(&tmp)?;
-    fs::rename(tmp.join(tag), &dest).or_else(|_| fs::rename(&tmp, &dest))?;
+    let unpacked = fs::read_dir(&tmp)?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.join("proton").is_file())
+        .with_context(|| format!("{} has no proton script", tarball.name))?;
+    let name = unpacked.file_name().unwrap().to_string_lossy().into_owned();
+    let dest = dest_root.join(&name);
+    let _ = fs::remove_dir_all(&dest);
+    fs::rename(&unpacked, &dest)?;
     let _ = fs::remove_dir_all(&tmp);
     let _ = fs::remove_file(&file);
     Ok(Proton {
-        name: tag.clone(),
+        name,
         path: dest,
         managed: true,
     })
