@@ -322,10 +322,20 @@ fn run(cmd: &str, args: &[&str]) -> Result<()> {
 
 /// Desktop notification, with Omarchy's richer one when available.
 /// `exec` runs when the notification is clicked.
-pub fn notify(headline: &str, body: &str, image: Option<&Path>, exec: &[&str]) {
+/// `timeout_ms` of `None` leaves expiry to the notification daemon.
+pub fn notify(
+    headline: &str,
+    body: &str,
+    image: Option<&Path>,
+    exec: &[&str],
+    timeout_ms: Option<u32>,
+) {
     if which("omarchy-notification-send").is_some() {
         let mut cmd = Command::new("omarchy-notification-send");
         cmd.args(["--app-name", "omavn", "-g", "󰂺", headline, body]);
+        if let Some(t) = timeout_ms {
+            cmd.arg("-t").arg(t.to_string());
+        }
         if let Some(img) = image.filter(|p| p.exists()) {
             cmd.arg("--image").arg(img);
         }
@@ -336,6 +346,9 @@ pub fn notify(headline: &str, body: &str, image: Option<&Path>, exec: &[&str]) {
     } else if which("notify-send").is_some() {
         let mut cmd = Command::new("notify-send");
         cmd.args(["--app-name=omavn", headline, body]);
+        if let Some(t) = timeout_ms {
+            cmd.arg(format!("--expire-time={t}"));
+        }
         if let Some(img) = image.filter(|p| p.exists()) {
             cmd.arg("-i").arg(img);
         }

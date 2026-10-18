@@ -1,6 +1,7 @@
 mod ui;
 
 use std::ffi::OsString;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -268,6 +269,7 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                     "Click to play",
                     Some(&omavn_core::art::cover(&paths, &game)),
                     &[&exe, "run", &game.id],
+                    None,
                 );
             }
             ui.result(&game, || {
@@ -327,10 +329,35 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 );
                 return Ok(ExitCode::SUCCESS);
             }
-            if !verbose && !cli.json {
+            // Launched from a menu or launcher: there is no terminal to show
+            // progress, and Proton takes a few seconds to open a window.
+            let headless = !std::io::stdout().is_terminal() && !cli.json;
+            if headless {
+                omavn_core::omarchy::notify(
+                    &format!("Starting {}", game.title),
+                    "",
+                    Some(&omavn_core::art::cover(&paths, &game)),
+                    &[],
+                    Some(5000),
+                );
+            } else if !verbose && !cli.json {
                 ui.line(&format!("▶ {}", game.title));
             }
+            let started = std::time::Instant::now();
             let status = child.wait()?;
+            if headless && !status.success() && started.elapsed().as_secs() < 15 {
+                let log_s = log.display().to_string();
+                omavn_core::omarchy::notify(
+                    &format!("{} didn't start", game.title),
+                    &format!(
+                        "Click for the log. Report it with: omavn feedback --game {}",
+                        game.id
+                    ),
+                    None,
+                    &["xdg-open", &log_s],
+                    None,
+                );
+            }
             if !status.success() && !verbose {
                 ui.line(&ui.dim(&format!("exited with {status}; log: {}", log.display())));
             }
