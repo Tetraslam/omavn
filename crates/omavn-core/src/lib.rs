@@ -22,6 +22,7 @@ pub mod omarchy;
 pub mod paths;
 pub mod report;
 pub mod runtime;
+pub mod saves;
 pub mod update;
 pub mod vndb;
 

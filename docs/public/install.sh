@@ -30,6 +30,17 @@ mkdir -p "$dir"
 install -m 755 "$tmp/omavn-$arch-unknown-linux-gnu/omavn" "$dir/omavn"
 echo "installed $("$dir/omavn" --version) to $dir/omavn"
 
+# Tab completion for bash (Omarchy's shell) and fish, if they're around.
+comp="${XDG_DATA_HOME:-$HOME/.local/share}"
+if command -v bash >/dev/null 2>&1; then
+  mkdir -p "$comp/bash-completion/completions"
+  "$dir/omavn" completions bash >"$comp/bash-completion/completions/omavn"
+fi
+if command -v fish >/dev/null 2>&1; then
+  mkdir -p "$HOME/.config/fish/completions"
+  "$dir/omavn" completions fish >"$HOME/.config/fish/completions/omavn.fish"
+fi
+
 case ":$PATH:" in
   *":$dir:"*) ;;
   *) echo "add $dir to your PATH, e.g.: echo 'export PATH=\"$dir:\$PATH\"' >> ~/.bashrc" ;;

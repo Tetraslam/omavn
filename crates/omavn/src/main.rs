@@ -21,7 +21,7 @@ struct Cli {
     json: bool,
 
     #[command(subcommand)]
-    command: Cmd,
+    command: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
@@ -134,6 +134,18 @@ enum Cmd {
         #[command(subcommand)]
         command: OmarchyCmd,
     },
+    /// Show where a game keeps its saves (for backups), newest first.
+    Saves {
+        game: String,
+        /// Open the newest save folder in your file manager.
+        #[arg(long)]
+        open: bool,
+    },
+    /// Print shell completions, e.g. `omavn completions bash > ~/.local/share/bash-completion/completions/omavn`.
+    Completions {
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
     /// Manage omavn itself.
     #[command(name = "self")]
     Itself {
@@ -224,7 +236,10 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
     let paths = Paths::from_env()?;
-    match cli.command {
+    let Some(command) = cli.command else {
+        return home(&paths, ui, cli.json);
+    };
+    match command {
         Cmd::Install {
             source,
             pick,
@@ -540,6 +555,25 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
                 return Ok(ExitCode::FAILURE);
             }
         }
+        Cmd::Saves { game, open } => {
+            let game = library::find(&paths, &game)?;
+            let dirs = omavn_core::saves::find(&paths, &game);
+            if open && let Some(d) = dirs.first() {
+                open_url(&d.display().to_string());
+            }
+            ui.result(&dirs, || {
+                if dirs.is_empty() {
+                    ui.line("no saves found yet (play a bit, then check again)");
+                }
+                for d in &dirs {
+                    ui.line(&d.display().to_string());
+                }
+            });
+        }
+        Cmd::Completions { shell } => {
+            use clap::CommandFactory;
+            clap_complete::generate(shell, &mut Cli::command(), "omavn", &mut std::io::stdout());
+        }
         Cmd::Omarchy { command } => match command {
             OmarchyCmd::Setup { skip_packages } => {
                 let exe = std::env::current_exe()?;
@@ -648,6 +682,34 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             });
         }
     }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `omavn` on its own: the library at a glance, or how to get started.
+fn home(paths: &Paths, ui: &Ui, json: bool) -> Result<ExitCode> {
+    let games = library::list(paths)?;
+    if json {
+        ui.result(&games, || {});
+        return Ok(ExitCode::SUCCESS);
+    }
+    ui.line(&format!(
+        "omavn {}: play visual novels on Linux\n",
+        env!("CARGO_PKG_VERSION")
+    ));
+    if games.is_empty() {
+        ui.line("no games yet. point omavn at a download, exactly as you got it:\n");
+        ui.line("  omavn install ~/Downloads/your-vn.zip");
+        ui.line("  omavn install ~/Downloads/\"A Folder Of Parts\"");
+        if omavn_core::omarchy::detected() && !omavn_core::omarchy::status().menu {
+            ui.line("\non Omarchy? omavn omarchy setup adds Visual Novels to your menu");
+        }
+    } else {
+        for g in &games {
+            ui.line(&format!("  {:<24} {}", g.id, g.title));
+        }
+        ui.line("\nplay one:  omavn run <id>    browse:  omavn library    add more:  omavn install <download>");
+    }
+    ui.line(&ui.dim("\nall commands: omavn --help    docs: https://omavn.dev"));
     Ok(ExitCode::SUCCESS)
 }
 

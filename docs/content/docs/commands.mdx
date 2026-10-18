@@ -3,6 +3,8 @@ title: Commands
 description: Every omavn command. Add --json to any of them for machine-readable output.
 ---
 
+Run `omavn` on its own to see your library and what to do next.
+
 ## install
 
 ```bash
@@ -76,7 +78,16 @@ omavn remove <game> [--yes]
 omavn remove --pick
 ```
 
-Deletes the game, its prefix, its saves, and its launcher entry. Asks first unless you pass `--yes`. Alias: `rm`.
+Deletes the game, its prefix, its saves (see `omavn saves` first), and its launcher entry. Asks first unless you pass `--yes`. Alias: `rm`.
+
+## saves
+
+```bash
+omavn saves <game>          # save folders, newest first
+omavn saves <game> --open   # open the newest in your file manager
+```
+
+Finds save data by what changed after install: the Wine prefix's AppData and Documents, `save` folders in the game, and `~/.renpy` for native Ren'Py games. Back these up before `omavn remove`.
 
 ## exec
 
@@ -122,9 +133,17 @@ omavn self check
 
 Updates omavn in place from the latest GitHub release (checksum verified).
 
+## completions
+
+```bash
+omavn completions bash > ~/.local/share/bash-completion/completions/omavn
+```
+
+Also `zsh`, `fish`, `elvish`, `powershell`. The install script sets up bash and fish for you.
+
 ## doctor
 
-Checks python3, display, Vulkan, gamescope, disk space, and runtimes.
+Checks python3, display, Vulkan (including the 32-bit drivers most VNs need), gamescope, disk space, and runtimes.
 
 ## feedback
 
