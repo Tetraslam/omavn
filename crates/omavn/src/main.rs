@@ -828,6 +828,20 @@ fn doctor(paths: &Paths) -> Vec<Check> {
                 .into()
         },
     );
+    let lib32 = omavn_core::desktop::lib32_vulkan();
+    add(
+        "32-bit vulkan",
+        lib32,
+        false,
+        if lib32 {
+            "found (most VNs are 32-bit)".into()
+        } else {
+            format!(
+                "missing; 32-bit games may render black. {}",
+                omavn_core::desktop::lib32_vulkan_hint()
+            )
+        },
+    );
     let display = std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok();
     add(
         "display",

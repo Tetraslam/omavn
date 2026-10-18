@@ -128,6 +128,17 @@ fn finish(
         Runner::Proton => {
             runtime::proton(paths, reporter)?;
             runtime::umu(paths, reporter)?;
+            if targets
+                .iter()
+                .any(|t| detect::is_32bit_exe(&files.join(&t.exe)))
+                && !crate::desktop::lib32_vulkan()
+            {
+                reporter.warn(format!(
+                    "this is a 32-bit game and 32-bit Vulkan drivers are missing, so it may show a black screen; {}",
+                    crate::desktop::lib32_vulkan_hint()
+                ));
+            }
+            prepare_prefix(paths, id, reporter)?;
         }
     }
 
@@ -174,6 +185,36 @@ fn title_from(files: &Path, id: &str) -> String {
         .map(|n| n.to_string_lossy().into_owned())
         .filter(|n| n != "files")
         .unwrap_or_else(|| id.replace('-', " "))
+}
+
+/// Create the game's Wine prefix now, so the first launch is instant. The
+/// very first prefix also makes umu download the Steam runtime.
+fn prepare_prefix(paths: &Paths, id: &str, reporter: &dyn Reporter) -> Result<()> {
+    let prefix = paths.game(id).join("prefix");
+    if prefix.join("drive_c").is_dir() {
+        return Ok(());
+    }
+    reporter.step("preparing the Wine prefix (the first one also downloads the Steam runtime)");
+    let spec = launch::proton_spec(
+        paths,
+        &prefix,
+        &library::umu_id(id),
+        vec!["wineboot".into(), "-u".into()],
+        paths.game(id),
+        reporter,
+    )?;
+    let log = fs::File::create(paths.game(id).join("last-run.log"))?;
+    let status = spec
+        .command()
+        .stdout(log.try_clone()?)
+        .stderr(log)
+        .status()?;
+    if !status.success() {
+        reporter.warn(format!(
+            "preparing the prefix exited with {status}; it will be retried on first launch"
+        ));
+    }
+    Ok(())
 }
 
 /// Run a Windows installer into `games/<id>/files`. Returns the game files

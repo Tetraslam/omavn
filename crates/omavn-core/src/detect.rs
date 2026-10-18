@@ -375,6 +375,23 @@ pub fn slug(s: &str) -> String {
     if out.is_empty() { "game".into() } else { out }
 }
 
+/// Whether a Windows executable is 32-bit (i386), from its PE header.
+pub fn is_32bit_exe(exe: &Path) -> bool {
+    let mut head = [0u8; 4096];
+    let Ok(n) = File::open(exe).and_then(|mut f| f.read(&mut head)) else {
+        return false;
+    };
+    let head = &head[..n];
+    let Some(pe) = head
+        .get(0x3c..0x40)
+        .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
+    else {
+        return false;
+    };
+    head.get(pe..pe + 6)
+        .is_some_and(|h| &h[..4] == b"PE\0\0" && h[4..6] == [0x4c, 0x01])
+}
+
 /// Ren'Py version from `renpy/vc_version.py`, e.g. "8.5.2".
 pub fn renpy_version(root: &Path) -> Option<String> {
     let text = fs::read_to_string(root.join("renpy/vc_version.py")).ok()?;
@@ -413,6 +430,23 @@ mod tests {
         assert_eq!(slug("Dies irae DX package"), "dies-irae-dx-package");
         assert_eq!(slug("  HimaNatsu!! "), "himanatsu");
         assert_eq!(slug("向日葵"), "向日葵");
+    }
+
+    #[test]
+    fn pe_bitness() {
+        let dir = std::env::temp_dir().join(format!("omavn-pe-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let mut img = vec![0u8; 0x100];
+        img[..2].copy_from_slice(b"MZ");
+        img[0x3c] = 0x80;
+        img[0x80..0x84].copy_from_slice(b"PE\0\0");
+        img[0x84..0x86].copy_from_slice(&[0x4c, 0x01]);
+        fs::write(dir.join("x86.exe"), &img).unwrap();
+        img[0x84..0x86].copy_from_slice(&[0x64, 0x86]);
+        fs::write(dir.join("x64.exe"), &img).unwrap();
+        assert!(is_32bit_exe(&dir.join("x86.exe")));
+        assert!(!is_32bit_exe(&dir.join("x64.exe")));
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

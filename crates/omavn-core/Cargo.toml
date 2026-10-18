@@ -27,3 +27,6 @@ ureq = "3.4.2"
 walkdir = "2.5.0"
 zip = { version = "9.0.5", default-features = false, features = ["deflate", "deflate64", "bzip2", "lzma", "zstd", "xz"] }
 
+[dev-dependencies]
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
+
