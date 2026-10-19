@@ -17,6 +17,8 @@ omavn --json list | jq -r '.[].id'
 omavn --json run dies-irae --print   # the exact program, argv, env, cwd
 ```
 
+<Clip name="cli-agents" alt="Terminal recording: omavn --json list piped through jq, omavn --json run --print showing the launch program and environment, and an unknown game failing with exit code 1" />
+
 Nothing prompts in JSON mode or without a terminal: commands that would ask (`run` or `remove` without a game, `remove` without `--yes`) fail with a message instead. Only `omavn gui` ever opens a window, and only because you asked for it.
 
 ```bash

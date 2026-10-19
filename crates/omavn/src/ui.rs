@@ -1,4 +1,15 @@
 use std::io::{IsTerminal, Write};
+
+/// `println!` that exits quietly when stdout is closed (`omavn list | head`)
+/// instead of panicking.
+macro_rules! out {
+    ($($arg:tt)*) => {{
+        let mut stdout = std::io::stdout().lock();
+        if writeln!(stdout, $($arg)*).is_err() {
+            std::process::exit(0);
+        }
+    }};
+}
 use std::sync::Mutex;
 
 use indicatif::{ProgressBar, ProgressStyle};
@@ -25,7 +36,7 @@ impl Ui {
     /// Print a command's result: JSON on stdout, or run `human`.
     pub fn result<T: serde::Serialize>(&self, value: &T, human: impl FnOnce()) {
         if self.json {
-            println!(
+            out!(
                 "{}",
                 serde_json::to_string_pretty(value).unwrap_or_default()
             );
@@ -35,7 +46,7 @@ impl Ui {
     }
 
     pub fn line(&self, s: &str) {
-        println!("{s}");
+        out!("{s}");
     }
 
     pub fn dim(&self, s: &str) -> String {
@@ -48,9 +59,9 @@ impl Ui {
 
     pub fn success(&self, s: &str) {
         if self.color {
-            println!("{} {s}", "✓".green());
+            out!("{} {s}", "✓".green());
         } else {
-            println!("{s}");
+            out!("{s}");
         }
     }
 
@@ -63,7 +74,7 @@ impl Ui {
             (false, true, false) => "FAIL".into(),
             (false, false, false) => "warn".into(),
         };
-        println!("{mark} {name:<14} {detail}");
+        out!("{mark} {name:<14} {detail}");
     }
 
     pub fn error(&self, e: &anyhow::Error) {

@@ -31,7 +31,7 @@ pub struct Options {
 }
 
 pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result<Game> {
-    reporter.step(format!("reading {}", opts.source.display()));
+    reporter.step(format!("reading {}", crate::paths::pretty(&opts.source)));
     let staged = ingest::unwrap(&opts.source, &paths.staging(), reporter)?;
     let payload = detect::classify(&staged.root())?;
 
@@ -50,7 +50,10 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
                 .or(entry.map(|e| e.id))
                 .unwrap_or_else(|| detect::guess_id(root, *engine, &source_name));
             let id = library::free_id(paths, &base);
-            reporter.step(format!("installing to {}", paths.game(&id).display()));
+            reporter.step(format!(
+                "installing to {}",
+                crate::paths::pretty(&paths.game(&id))
+            ));
             ingest::materialize(root, &paths.game(&id).join("files"))?;
             (id, PathBuf::from("files"))
         }

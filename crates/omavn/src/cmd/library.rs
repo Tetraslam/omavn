@@ -7,6 +7,7 @@ use omavn_core::library::{self, Game};
 use super::played;
 use crate::cli::{ListArgs, SortBy};
 use crate::ui::Ui;
+use omavn_core::paths::pretty;
 
 /// `omavn` on its own: a summary that stays short with a big library.
 pub fn home(paths: &Paths, ui: &Ui, json: bool) -> Result<ExitCode> {
@@ -112,9 +113,9 @@ pub fn info(paths: &Paths, ui: &Ui, game: String) -> Result<ExitCode> {
         ui.line(&format!("{} ({})", game.title, game.id));
         ui.line(&format!("  engine   {}", game.engine.name()));
         ui.line(&format!("  runner   {:?}", game.runner));
-        ui.line(&format!("  files    {}", game.files_dir(paths).display()));
+        ui.line(&format!("  files    {}", pretty(&game.files_dir(paths))));
         if game.prefix(paths).exists() {
-            ui.line(&format!("  prefix   {}", game.prefix(paths).display()));
+            ui.line(&format!("  prefix   {}", pretty(&game.prefix(paths))));
         }
         ui.line("  targets");
         for t in &game.targets {

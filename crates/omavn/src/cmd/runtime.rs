@@ -5,6 +5,7 @@ use omavn_core::{Paths, runtime};
 
 use crate::cli::RuntimeKind;
 use crate::ui::Ui;
+use omavn_core::paths::pretty;
 
 pub fn list(paths: &Paths, ui: &Ui) -> Result<ExitCode> {
     let protons = runtime::find_protons(paths);
@@ -30,7 +31,7 @@ pub fn list(paths: &Paths, ui: &Ui) -> Result<ExitCode> {
             ui.line(&format!(
                 " {mark} {:<28} {}",
                 p.name,
-                ui.dim(&format!("{tag}, {}", p.path.display()))
+                ui.dim(&format!("{tag}, {}", pretty(&p.path)))
             ));
         }
         ui.line(&format!(
@@ -67,7 +68,7 @@ pub fn install(
     };
     ui.finish_progress();
     ui.result(&serde_json::json!({ "path": path }), || {
-        ui.success(&format!("ready: {}", path.display()))
+        ui.success(&format!("ready: {}", pretty(&path)))
     });
     Ok(ExitCode::SUCCESS)
 }

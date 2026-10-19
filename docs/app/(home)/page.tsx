@@ -10,6 +10,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CopyCommand } from "@/components/copy-command";
 import { Logo } from "@/components/logo";
+import { Clip } from "@/components/media";
 
 const features: { icon: ReactNode; title: string; body: string }[] = [
   {
@@ -44,20 +45,6 @@ const features: { icon: ReactNode; title: string; body: string }[] = [
   },
 ];
 
-const demo = [
-  { kind: "cmd", text: 'omavn install ~/Downloads/"Dies irae"' },
-  { kind: "step", text: "extracting MG1041_1.zip" },
-  { kind: "step", text: "extracting MG1041_2.zip" },
-  { kind: "step", text: "extracting MG1041_3.zip" },
-  { kind: "step", text: "extracting Dies Irae.part1.exe" },
-  { kind: "step", text: "installing to ~/.local/share/omavn/games/dies-irae" },
-  { kind: "step", text: "fetching metadata and art" },
-  { kind: "info", text: "  VNDB: Dies irae ~Acta est Fabula~ (v548)" },
-  { kind: "ok", text: "installed Dies irae as `dies-irae`" },
-  { kind: "cmd", text: "omavn run dies" },
-  { kind: "info", text: "▶ Dies irae" },
-] as const;
-
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col">
@@ -91,46 +78,37 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section aria-label="Example session" className="px-6 pb-20">
-        <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border bg-fd-card shadow-2xl">
-          <div
-            className="flex items-center gap-1.5 border-b px-4 py-3"
-            aria-hidden="true"
-          >
-            <span className="size-3 rounded-full bg-fd-muted-foreground/30" />
-            <span className="size-3 rounded-full bg-fd-muted-foreground/30" />
-            <span className="size-3 rounded-full bg-fd-muted-foreground/30" />
-          </div>
-          <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-6">
-            {demo.map((l) => (
-              <div
-                key={l.text}
-                className={l.kind === "cmd" ? "mt-3 first:mt-0" : undefined}
-              >
-                {l.kind === "cmd" && (
-                  <>
-                    <span className="text-fd-primary">$ </span>
-                    <span>{l.text}</span>
-                  </>
-                )}
-                {l.kind === "step" && (
-                  <>
-                    <span className="text-wisteria">→ </span>
-                    <span className="text-fd-muted-foreground">{l.text}</span>
-                  </>
-                )}
-                {l.kind === "info" && (
-                  <span className="text-fd-muted-foreground">{l.text}</span>
-                )}
-                {l.kind === "ok" && (
-                  <>
-                    <span className="text-emerald-400">✓ </span>
-                    <span>{l.text}</span>
-                  </>
-                )}
-              </div>
-            ))}
-          </pre>
+      <section
+        aria-label="omavn installing and starting a game"
+        className="px-6 pb-20"
+      >
+        <div className="mx-auto max-w-4xl">
+          <Clip
+            name="cli-install"
+            alt="Terminal recording: omavn install unpacks Dies irae's three zips and split RAR, downloads GE-Proton, prepares a Wine prefix, fetches art from VNDB, then omavn run starts the game"
+            caption="A fresh machine: three zips wrapping a split self-extracting RAR, to playable. Real run, sped up 2.5x."
+          />
+        </div>
+      </section>
+
+      <section className="px-6 pb-24">
+        <h2 className="mb-3 text-center font-display text-4xl">
+          And then it just plays
+        </h2>
+        <p className="mx-auto mb-10 max-w-xl text-center text-fd-muted-foreground">
+          Recorded on Linux straight after install. No settings touched.
+        </p>
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+          <Clip
+            name="dies-irae"
+            alt="Dies irae's opening running through omavn: Japanese narration with English subtitles"
+            caption="Dies irae: video, Japanese text, English subtitles."
+          />
+          <Clip
+            name="yumina"
+            alt="Yumina the Ethereal running in gamescope: startup dialog, Start Game, the title screen, then the story"
+            caption="Yumina the Ethereal: an 800x600 game, scaled up, clicks landing right."
+          />
         </div>
       </section>
 
@@ -169,6 +147,13 @@ export default function HomePage() {
           </p>
           <div className="mt-8 max-w-md">
             <CopyCommand command="omavn omarchy setup" />
+          </div>
+          <div className="mt-8">
+            <Clip
+              name="omarchy-picker"
+              alt="Omarchy's full-screen cover grid showing Dies irae and Yumina the Ethereal, browsed with the arrow keys"
+              caption="Super + Shift + V opens your library in Omarchy's cover grid."
+            />
           </div>
           <Link
             href="/docs/omarchy"

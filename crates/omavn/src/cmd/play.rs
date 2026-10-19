@@ -8,6 +8,7 @@ use omavn_core::{Paths, launch, runtime};
 use super::{exit_code, pick_in_terminal, time_now};
 use crate::cli::RunArgs;
 use crate::ui::Ui;
+use omavn_core::paths::pretty;
 
 pub fn run(paths: &Paths, ui: &Ui, json: bool, args: RunArgs) -> Result<ExitCode> {
     let RunArgs {
@@ -107,7 +108,7 @@ pub fn run(paths: &Paths, ui: &Ui, json: bool, args: RunArgs) -> Result<ExitCode
             );
         }
         if !status.success() && !verbose {
-            ui.line(&ui.dim(&format!("exited with {status}; log: {}", log.display())));
+            ui.line(&ui.dim(&format!("exited with {status}; log: {}", pretty(&log))));
         }
         return Ok(exit_code(status));
     }

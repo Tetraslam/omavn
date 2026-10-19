@@ -7,6 +7,7 @@ use omavn_core::{Paths, launch, runtime};
 use super::{exit_code, open_url, pick_in_terminal};
 use crate::cli::{ExecArgs, MetaArgs, RemoveArgs, SavesArgs, SetArgs, WinetricksArgs};
 use crate::ui::Ui;
+use omavn_core::paths::pretty;
 
 pub fn meta(paths: &Paths, ui: &Ui, args: MetaArgs) -> Result<ExitCode> {
     let MetaArgs { game, vndb, all } = args;
@@ -113,7 +114,7 @@ pub fn saves(paths: &Paths, ui: &Ui, args: SavesArgs) -> Result<ExitCode> {
     if let Some(src) = import {
         let dest = omavn_core::saves::import(paths, &game, &src)?;
         ui.result(&serde_json::json!({ "imported": dest }), || {
-            ui.success(&format!("copied saves to {}", dest.display()))
+            ui.success(&format!("copied saves to {}", pretty(&dest)))
         });
         return Ok(ExitCode::SUCCESS);
     }
@@ -126,7 +127,7 @@ pub fn saves(paths: &Paths, ui: &Ui, args: SavesArgs) -> Result<ExitCode> {
             ui.line("no saves found yet (play a bit, then check again)");
         }
         for d in &dirs {
-            ui.line(&d.display().to_string());
+            ui.line(&pretty(d));
         }
     });
     Ok(ExitCode::SUCCESS)

@@ -62,3 +62,17 @@ impl Paths {
         self.config.join("config.toml")
     }
 }
+
+/// `path` for people: the home directory shortened to `~`.
+pub fn pretty(path: &std::path::Path) -> String {
+    if let Some(home) = std::env::var_os("HOME").filter(|h| !h.is_empty())
+        && let Ok(rest) = path.strip_prefix(&home)
+    {
+        return if rest.as_os_str().is_empty() {
+            "~".into()
+        } else {
+            format!("~/{}", rest.display())
+        };
+    }
+    path.display().to_string()
+}

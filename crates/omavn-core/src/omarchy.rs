@@ -4,7 +4,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 
@@ -105,7 +105,10 @@ pub fn setup(omavn: &Path, skip_packages: bool) -> Result<Vec<String>> {
         None
     };
     if write_if_changed(&hypr_rules(), &rules_lua(bind))? {
-        changes.push(format!("wrote window rules to {}", hypr_rules().display()));
+        changes.push(format!(
+            "wrote window rules to {}",
+            crate::paths::pretty(&hypr_rules())
+        ));
     }
     let main = hypr_main();
     let text = fs::read_to_string(&main).with_context(|| format!("reading {}", main.display()))?;
@@ -115,13 +118,13 @@ pub fn setup(omavn: &Path, skip_packages: bool) -> Result<Vec<String>> {
             &main,
             format!("{}{block}", text.trim_end_matches('\n').to_owned() + "\n"),
         )?;
-        changes.push(format!("loaded them from {}", main.display()));
+        changes.push(format!("loaded them from {}", crate::paths::pretty(&main)));
     }
 
     if add_menu_entries(omavn)? {
         changes.push(format!(
             "added Visual Novels to the Omarchy menu ({})",
-            menu_file().display()
+            crate::paths::pretty(&menu_file())
         ));
     }
     Ok(changes)
@@ -139,10 +142,13 @@ pub fn remove() -> Result<Vec<String>> {
             .filter(|l| !l.contains("require(\"hypr.omavn\")") && !l.contains(MARK))
             .collect();
         fs::write(&main, kept.join("\n").trim_end().to_owned() + "\n")?;
-        changes.push(format!("unloaded window rules from {}", main.display()));
+        changes.push(format!(
+            "unloaded window rules from {}",
+            crate::paths::pretty(&main)
+        ));
     }
     if fs::remove_file(hypr_rules()).is_ok() {
-        changes.push(format!("deleted {}", hypr_rules().display()));
+        changes.push(format!("deleted {}", crate::paths::pretty(&hypr_rules())));
     }
     if remove_menu_entries()? {
         changes.push("removed Visual Novels from the Omarchy menu".into());
@@ -409,7 +415,7 @@ pub fn notify(
         if !exec.is_empty() {
             cmd.arg("--exec").args(exec);
         }
-        let _ = cmd.status();
+        let _ = cmd.stdout(Stdio::null()).stderr(Stdio::null()).status();
     } else if which("notify-send").is_some() {
         let mut cmd = Command::new("notify-send");
         cmd.args(["--app-name=omavn", headline, body]);
@@ -419,7 +425,7 @@ pub fn notify(
         if let Some(img) = image.filter(|p| p.exists()) {
             cmd.arg("-i").arg(img);
         }
-        let _ = cmd.status();
+        let _ = cmd.stdout(Stdio::null()).stderr(Stdio::null()).status();
     }
 }
 
