@@ -1,6 +1,6 @@
 pkgbase = omavn-bin
 	pkgdesc = Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest
-	pkgver = 0.6.2
+	pkgver = 0.6.3
 	pkgrel = 1
 	url = https://omavn.dev
 	arch = x86_64
@@ -16,9 +16,9 @@ pkgbase = omavn-bin
 	provides = omavn
 	conflicts = omavn
 	options = !debug
-	source_x86_64 = omavn-bin-0.6.2-x86_64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v0.6.2/omavn-x86_64-unknown-linux-gnu.tar.gz
-	sha256sums_x86_64 = efc736aa58601affd6004bec373519d2f79e58251c6a2e597812dc6bf607f38f
-	source_aarch64 = omavn-bin-0.6.2-aarch64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v0.6.2/omavn-aarch64-unknown-linux-gnu.tar.gz
-	sha256sums_aarch64 = 1ae874381d0cb28db945b2cd90cbfb748851c45617e9a2fdae48c90174925cff
+	source_x86_64 = omavn-bin-0.6.3-x86_64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v0.6.3/omavn-x86_64-unknown-linux-gnu.tar.gz
+	sha256sums_x86_64 = 865ed331044b21d1df9dd878dc12f386e9f903bf8e331fb02fe5ea6bb58882c2
+	source_aarch64 = omavn-bin-0.6.3-aarch64.tar.gz::https://github.com/Tetraslam/omavn/releases/download/v0.6.3/omavn-aarch64-unknown-linux-gnu.tar.gz
+	sha256sums_aarch64 = ab449fbaacb1fcd34dd1cc15530896cec0a5ff3a768943cfc7ece0cf67fefe7e
 
 pkgname = omavn-bin
