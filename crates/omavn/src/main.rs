@@ -13,6 +13,13 @@ use crate::ui::Ui;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    // Installs and patches unpack tens of gigabytes; keep their memory use
+    // from pushing the rest of the desktop out.
+    if matches!(cli.command, Some(Cmd::Install(_) | Cmd::Patch { .. }))
+        && let Some(status) = omavn_core::confine::rerun_confined()
+    {
+        return cmd::exit_code(status);
+    }
     let ui = Ui::new(cli.json);
     match run(cli, &ui) {
         Ok(code) => code,

@@ -10,6 +10,7 @@ pub mod archive;
 pub mod art;
 pub mod batch;
 pub mod catalog;
+pub mod confine;
 pub mod desktop;
 pub mod detect;
 pub mod download;
