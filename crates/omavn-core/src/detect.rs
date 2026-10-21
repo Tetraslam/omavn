@@ -103,6 +103,10 @@ pub fn classify(dir: &Path) -> Result<Payload> {
     let engine = engine(&root);
     let exes = executables(&root);
 
+    if let Some(exe) = install_source_setup(&root) {
+        let kind = installer_kind(&exe).unwrap_or(InstallerKind::Unknown);
+        return Ok(Payload::Installer { exe, kind });
+    }
     if engine != Engine::Unknown {
         return Ok(Payload::Game { root, engine });
     }
@@ -110,7 +114,11 @@ pub fn classify(dir: &Path) -> Result<Payload> {
     // the finished game folder, which the installer would only copy.
     let subgames: Vec<(PathBuf, Engine)> = list(&root)
         .into_iter()
-        .filter(|p| p.is_dir() && !archive::is_junk(Path::new(&lower_name(p))))
+        .filter(|p| {
+            p.is_dir()
+                && !archive::is_junk(Path::new(&lower_name(p)))
+                && install_source_setup(p).is_none()
+        })
         .map(|d| {
             let e = self::engine(&d);
             (d, e)
@@ -152,6 +160,20 @@ pub fn classify(dir: &Path) -> Result<Payload> {
         });
     }
     bail!("no game or installer found in {}", root.display())
+}
+
+/// The setup.exe of a BURIKO install source: the folder looks like the
+/// finished game, but its BGI.exe refuses to run until setup has installed it.
+fn install_source_setup(dir: &Path) -> Option<PathBuf> {
+    let files = list(dir);
+    let names: Vec<String> = files.iter().map(|p| lower_name(p)).collect();
+    if !names
+        .iter()
+        .any(|n| n == "bgiforinstalling.exe" || n == "installer.arc")
+    {
+        return None;
+    }
+    files.into_iter().find(|p| lower_name(p) == "setup.exe")
 }
 
 /// Follow single-directory wrappers (`Game_final/Game/...`) down to the

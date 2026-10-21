@@ -82,6 +82,8 @@ pub fn run(paths: &Paths, ui: &Ui, json: bool, args: RunArgs) -> Result<ExitCode
             && opts.display.is_none()
             && game.display == Display::Auto
             && in_gamescope(&spec)
+            // If the desktop itself went away, gamescope isn't to blame.
+            && omavn_core::desktop::display_alive()
         {
             ui.line(&format!(
                 "{} didn't start in gamescope; using a plain window from now on (undo: omavn set {} display auto)",

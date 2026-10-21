@@ -310,13 +310,17 @@ fn run_installer(
     let cwd = exe.parent().unwrap_or(Path::new("/")).to_path_buf();
     // Fetches Proton and umu first if needed, so progress reads in order.
     let spec = launch::proton_spec(paths, &prefix, &library::umu_id(id), args, cwd, reporter)?;
+    let kind = match kind {
+        InstallerKind::Unknown => String::from("the"),
+        k => format!("{k:?}"),
+    };
     if silent.is_some() {
         reporter.step(format!(
-            "running {kind:?} installer unattended (the first one also sets up the Steam runtime)"
+            "running {kind} installer unattended (the first one also sets up the Steam runtime)"
         ));
     } else {
         reporter.step(format!(
-            "running {kind:?} installer; click through it, any install location works"
+            "running {kind} installer; click through it, any install location works"
         ));
     }
     let started = time::OffsetDateTime::now_utc().unix_timestamp();

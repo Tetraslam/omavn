@@ -126,3 +126,24 @@ fn a_bare_installer_download() {
     drop(staged);
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn a_buriko_install_source_is_an_installer() {
+    let dir = scratch("buriko");
+    let disc = dir.join("Wonderful Everyday Setup");
+    let src = disc.join("Subahibi");
+    fs::create_dir_all(&src).unwrap();
+    for f in ["BGI.exe", "BGIForInstalling.exe", "Setup.exe"] {
+        fs::write(src.join(f), b"MZ fake").unwrap();
+    }
+    fs::write(src.join("installer.arc"), b"data").unwrap();
+    fs::write(disc.join("Setup.exe"), b"MZ fake").unwrap();
+    fs::write(disc.join("AutoRun.inf"), b"[autorun]").unwrap();
+    for root in [&disc, &src] {
+        match detect::classify(root).unwrap() {
+            Payload::Installer { exe, .. } => assert!(exe.ends_with("Setup.exe")),
+            other => panic!("expected an installer, got {other:?}"),
+        }
+    }
+    fs::remove_dir_all(dir).unwrap();
+}

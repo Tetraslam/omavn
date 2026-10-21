@@ -6,6 +6,30 @@ pub fn has_display() -> bool {
     std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("DISPLAY").is_some()
 }
 
+/// Whether the session's display server still answers (its Wayland
+/// socket or X11 socket exists), as opposed to just being named in env.
+pub fn display_alive() -> bool {
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from);
+    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some_and(|w| {
+        let w = std::path::PathBuf::from(w);
+        if w.is_absolute() {
+            w.exists()
+        } else {
+            runtime.as_ref().is_some_and(|r| r.join(&w).exists())
+        }
+    });
+    let x11 = std::env::var("DISPLAY").ok().is_some_and(|d| {
+        let n = d
+            .trim_start_matches(':')
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .to_string();
+        std::path::Path::new(&format!("/tmp/.X11-unix/X{n}")).exists()
+    });
+    wayland || x11
+}
+
 pub fn is_hyprland() -> bool {
     std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
 }
