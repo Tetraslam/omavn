@@ -15,6 +15,7 @@ pub mod desktop;
 pub mod detect;
 pub mod download;
 pub mod feedback;
+pub mod fixes;
 pub mod ingest;
 pub mod install;
 pub mod launch;

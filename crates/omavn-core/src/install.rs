@@ -231,6 +231,23 @@ fn finish(
             game.env.insert(var.into(), JAPANESE_LOCALE.into());
         }
     }
+    if runner == Runner::Proton
+        && engine == Engine::Kirikiri
+        && crate::fixes::needs_kernel32_fix(&files)
+    {
+        reporter.info("this game's copy check rejects Wine's kernel32; adding KirikiriTools' fix");
+        let exe_dir = game
+            .targets
+            .iter()
+            .find(|t| t.id == game.default_target)
+            .and_then(|t| files.join(&t.exe).parent().map(Path::to_path_buf))
+            .unwrap_or_else(|| files.clone());
+        if let Err(e) = crate::fixes::kernel32(paths, &mut game, &exe_dir, reporter) {
+            reporter.warn(format!(
+                "couldn't add the fix ({e:#}); the game may not start"
+            ));
+        }
+    }
     game.save(paths)?;
     let verbs = entry
         .as_ref()

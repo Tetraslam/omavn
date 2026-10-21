@@ -94,7 +94,7 @@ fn extract_binary(tarball: &Path, dest: &Path) -> Result<()> {
     bail!("release archive has no omavn binary")
 }
 
-fn verify_sha256(file: &Path, expected: &str) -> Result<()> {
+pub(crate) fn verify_sha256(file: &Path, expected: &str) -> Result<()> {
     let mut hasher = Sha256::new();
     let mut f = File::open(file)?;
     let mut buf = vec![0u8; 1 << 20];
