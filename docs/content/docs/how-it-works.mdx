@@ -19,7 +19,7 @@ It stops as soon as it finds a real `.exe`, so data archives that belong to an i
 
 The unwrapped folder is either a **game** or an **installer**.
 
-- Installers are fingerprinted (NSIS, Inno Setup, MSI, InstallShield, WiX) and run unattended under Proton when the framework supports it. Chained DirectX redist wizards are skipped, since Proton already provides those DLLs.
+- Installers are fingerprinted (NSIS, Inno Setup, MSI, InstallShield, WiX, Setup Factory) and run unattended under Proton when the framework supports it. Chained DirectX redist wizards are skipped, since Proton already provides those DLLs.
 - Games get an engine fingerprint (Ren'Py, KiriKiri, Malie, Siglus, BGI, NScripter, Artemis, CatSystem2, QLIE, YU-RIS, LiveMaker, Unity, RPG Maker, TyranoScript) and a ranked list of entry points, with uninstallers, redists, and helper binaries filtered out.
 
 ## 3. Catalog
@@ -34,6 +34,8 @@ Some things heuristics can't know: that `malie_fabula.exe` is *Acta est Fabula* 
 | Proton | everything else | GE-Proton through umu-launcher, one Wine prefix per game |
 
 Native Ren'Py runs faster, uses your real audio and GPU stack, and touches nothing in the game folder.
+
+Some games refuse Wine outright, and omavn fixes the known cases at install. KiriKiri games whose copy check rejects Wine's kernel32 ("Authentication failed: unrecognized kernel32 module") get [KirikiriTools](https://github.com/arcusmaximus/KirikiriTools)' `version.dll` next to their exe, which makes the check compare the right paths. No game file changes.
 
 ## 5. Display
 

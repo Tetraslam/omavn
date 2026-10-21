@@ -21,7 +21,11 @@ Give it several downloads, or a folder of many (a drive full of VNs), and it pla
 ```bash
 omavn install /mnt/usb --dry-run   # just show the plan
 omavn install /mnt/usb --yes       # no question
-``` `<download>` can be a file or a folder. Alias: `add`.
+```
+
+A patch whose version the game's download already has (`muramasa_patch_1.04.exe` next to `muramasa_installer_1.04.exe`) is skipped. A folder holding one installed game, say copied off a Windows drive, installs as that game, not as a batch.
+
+`<download>` can be a file or a folder. Alias: `add`.
 
 - `--id` sets the library id (default: from the catalog or the folder name)
 - `--proton` runs a Ren'Py game through Proton instead of natively
