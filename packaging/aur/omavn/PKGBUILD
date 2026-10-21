@@ -1,6 +1,6 @@
 # Maintainer: Shresht Bhowmick <bhowmickshresht@gmail.com>
 pkgname=omavn
-pkgver=0.6.3
+pkgver=0.7.0
 pkgrel=1
 pkgdesc="Play visual novels on Linux: point it at whatever you downloaded and it figures out the rest"
 arch=('x86_64' 'aarch64')
@@ -15,7 +15,7 @@ optdepends=(
 )
 options=('!debug' '!lto')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Tetraslam/omavn/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('9056b86fb7b5becb038f1e39eba6aa7fb80dce70f0014aded84548f99da774a9')
+sha256sums=('2893820ccf16868a5d2977a4b04bb52f3f5330b6bb2da4a4feb891638701f5bf')
 
 prepare() {
   cd "$pkgname-$pkgver"
