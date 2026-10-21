@@ -27,6 +27,9 @@ pub fn install(paths: &Paths, ui: &Ui, json: bool, args: InstallArgs) -> Result<
     } else {
         sources
     };
+    if let Some(missing) = sources.iter().find(|s| !s.exists()) {
+        bail!("{} not found", missing.display());
+    }
 
     // One folder of many downloads, or several paths: plan them as a batch.
     let units = match sources.as_slice() {
