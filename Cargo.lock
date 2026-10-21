@@ -781,6 +781,7 @@ dependencies = [
  "encoding_rs",
  "flate2",
  "image",
+ "libc",
  "memchr",
  "pelite",
  "rayon",

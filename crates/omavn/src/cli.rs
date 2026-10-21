@@ -18,7 +18,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
-    /// Install a game from a download (file or folder).
+    /// Install games from downloads: one file or folder, several, or a folder of many.
     #[command(visible_alias = "add")]
     Install(InstallArgs),
     /// Launch an installed game.
@@ -41,6 +41,13 @@ pub enum Cmd {
     /// Uninstall a game, including its saves.
     #[command(visible_alias = "rm")]
     Remove(RemoveArgs),
+    /// Apply an update or patch to an installed game.
+    Patch {
+        game: String,
+        /// The patch download: archive, patcher program, or loose files.
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
     /// Run a program inside a game's Wine prefix (e.g. `winecfg`, or another exe).
     Exec(ExecArgs),
     /// Install Windows components into a game's prefix with winetricks (e.g. quartz wmp9).
@@ -65,6 +72,11 @@ pub enum Cmd {
     Completions {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
+    },
+    /// Add your games to Steam (Big Picture, Steam Deck, controllers), with library art.
+    Steam {
+        #[command(subcommand)]
+        command: SteamCmd,
     },
     /// Manage omavn itself.
     #[command(name = "self")]
@@ -113,6 +125,25 @@ pub enum OmarchyCmd {
 }
 
 #[derive(Subcommand)]
+pub enum SteamCmd {
+    /// Add games as non-Steam games (all installed games when none are named).
+    Add {
+        games: Vec<String>,
+        /// Close Steam first if it's running, and start it again after.
+        #[arg(long)]
+        restart: bool,
+    },
+    /// Remove omavn's shortcuts (all of them when no games are named).
+    Remove {
+        games: Vec<String>,
+        #[arg(long)]
+        restart: bool,
+    },
+    /// Show which games are in Steam.
+    Status,
+}
+
+#[derive(Subcommand)]
 pub enum SelfAction {
     /// Update omavn to the latest release.
     Update {
@@ -141,9 +172,16 @@ pub enum FeedbackKind {
 
 #[derive(Args)]
 pub struct InstallArgs {
-    /// The archive, installer, or folder you downloaded.
+    /// What you downloaded: an archive, installer, or folder. Several
+    /// paths, or a folder of many downloads, install everything in it.
     #[arg(required_unless_present = "pick")]
-    pub source: Option<PathBuf>,
+    pub sources: Vec<PathBuf>,
+    /// Show what would be installed, then stop.
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Don't ask before installing several games.
+    #[arg(short, long)]
+    pub yes: bool,
     /// Choose the download from a menu (Omarchy).
     #[arg(long)]
     pub pick: bool,
@@ -246,13 +284,19 @@ pub struct WinetricksArgs {
 
 #[derive(Args)]
 pub struct SavesArgs {
-    pub game: String,
+    /// The game; with --import and no game, every installed game.
+    #[arg(required_unless_present = "import")]
+    pub game: Option<String>,
     /// Open the newest save folder in your file manager.
     #[arg(long)]
     pub open: bool,
-    /// Copy saves from Windows into the game, e.g. /mnt/c/Users/me/AppData/Roaming/light.
+    /// Copy saves from Windows: a whole Windows drive or user folder (finds
+    /// every game's saves), or one save folder when a game is named.
     #[arg(long, value_name = "PATH")]
     pub import: Option<PathBuf>,
+    /// With --import: show what would be copied, then stop.
+    #[arg(long, requires = "import")]
+    pub dry_run: bool,
 }
 
 #[derive(Args)]

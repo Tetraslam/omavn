@@ -35,22 +35,34 @@ impl Drop for Staged {
 }
 
 pub fn unwrap(source: &Path, staging_root: &Path, reporter: &dyn Reporter) -> Result<Staged> {
-    let source =
-        fs::canonicalize(source).with_context(|| format!("{} not found", source.display()))?;
+    unwrap_all(&[source.to_path_buf()], staging_root, reporter)
+}
+
+/// [`unwrap`] for a download made of several files or folders, staged
+/// side by side (an extractor stub next to its `.7z.001` and `.7z.002`).
+pub fn unwrap_all(
+    sources: &[PathBuf],
+    staging_root: &Path,
+    reporter: &dyn Reporter,
+) -> Result<Staged> {
     fs::create_dir_all(staging_root)?;
     let dir = unique_dir(staging_root)?;
     let staged = Staged { dir: dir.clone() };
 
-    if source.is_dir() {
-        for entry in fs::read_dir(&source)? {
-            let entry = entry?;
-            link(&entry.path(), &dir.join(entry.file_name()))?;
+    for source in sources {
+        let source =
+            fs::canonicalize(source).with_context(|| format!("{} not found", source.display()))?;
+        if source.is_dir() && sources.len() == 1 {
+            for entry in fs::read_dir(&source)? {
+                let entry = entry?;
+                link(&entry.path(), &dir.join(entry.file_name()))?;
+            }
+        } else {
+            link(
+                &source,
+                &dir.join(source.file_name().context("source has no file name")?),
+            )?;
         }
-    } else {
-        link(
-            &source,
-            &dir.join(source.file_name().context("source has no file name")?),
-        )?;
     }
 
     for _ in 0..MAX_ROUNDS {
@@ -63,12 +75,20 @@ pub fn unwrap(source: &Path, staging_root: &Path, reporter: &dyn Reporter) -> Re
         }
         // An exe that is not an archive means we reached a game or an
         // installer; archives next to it are its data, not wrappers.
+        let stubs: Vec<&PathBuf> = files
+            .iter()
+            .filter(|f| is_extractor_stub(f, &sets))
+            .collect();
         let plain_exe = files.iter().any(|f| {
             f.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe"))
                 && !sets.iter().any(|s| s.volumes.contains(f))
+                && !stubs.contains(&f)
         });
         if plain_exe {
             return Ok(staged);
+        }
+        for stub in stubs {
+            fs::remove_file(stub)?;
         }
         for set in sets {
             let label = set
@@ -85,6 +105,25 @@ pub fn unwrap(source: &Path, staging_root: &Path, reporter: &dyn Reporter) -> Re
         }
     }
     bail!("archives nested more than {MAX_ROUNDS} levels deep")
+}
+
+/// A small exe whose only job is extracting the archive next to it
+/// (`game.exe` beside `game.7z.001`), so not the game or an installer.
+fn is_extractor_stub(exe: &Path, sets: &[archive::ArchiveSet]) -> bool {
+    let stem = |p: &Path| {
+        let n = p
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase();
+        n.split('.').next().unwrap_or_default().to_string()
+    };
+    exe.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("exe"))
+        && fs::metadata(exe).is_ok_and(|m| m.len() < 4 << 20)
+        && sets
+            .iter()
+            .any(|s| !s.volumes.iter().any(|v| v == exe) && stem(s.first()) == stem(exe))
 }
 
 /// Copy `src` into `dest` (which must not exist), following the staging
@@ -106,6 +145,8 @@ pub fn materialize(src: &Path, dest: &Path) -> Result<()> {
         }
     } else {
         fs::copy(&real, dest).with_context(|| format!("copying {}", real.display()))?;
+        archive::drop_cache(&real, false);
+        archive::drop_cache(dest, true);
     }
     Ok(())
 }

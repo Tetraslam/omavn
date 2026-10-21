@@ -110,7 +110,11 @@ fn resolve_display(display: Display) -> Display {
         Ok("gamescope") => return Display::Gamescope,
         _ => {}
     }
+    // Already inside gamescope (Steam Deck Gaming Mode): it does the scaling.
+    let nested = std::env::var_os("GAMESCOPE_WAYLAND_DISPLAY").is_some()
+        || std::env::var("XDG_CURRENT_DESKTOP").is_ok_and(|d| d.eq_ignore_ascii_case("gamescope"));
     match display {
+        Display::Auto if nested => Display::Window,
         Display::Auto if runtime::which("gamescope").is_some() && desktop::has_display() => {
             Display::Gamescope
         }

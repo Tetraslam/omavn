@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use omavn_core::Paths;
 
-use crate::cli::{Cli, Cmd, OmarchyCmd, RuntimeCmd, SelfAction};
+use crate::cli::{Cli, Cmd, OmarchyCmd, RuntimeCmd, SelfAction, SteamCmd};
 use crate::ui::Ui;
 
 fn main() -> ExitCode {
@@ -39,6 +39,7 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
         Cmd::Set(args) => cmd::manage::set(paths, ui, args),
         Cmd::Info { game } => cmd::library::info(paths, ui, game),
         Cmd::Remove(args) => cmd::manage::remove(paths, ui, args),
+        Cmd::Patch { game, files } => cmd::install::patch(paths, ui, game, files),
         Cmd::Exec(args) => cmd::manage::exec(paths, ui, args),
         Cmd::Winetricks(args) => cmd::manage::winetricks(paths, ui, args),
         Cmd::Saves(args) => cmd::manage::saves(paths, ui, args),
@@ -54,6 +55,11 @@ fn run(cli: Cli, ui: &Ui) -> Result<ExitCode> {
             OmarchyCmd::Setup { skip_packages } => cmd::omarchy::setup(ui, skip_packages),
             OmarchyCmd::Remove => cmd::omarchy::remove(ui),
             OmarchyCmd::Status => cmd::omarchy::status(ui),
+        },
+        Cmd::Steam { command } => match command {
+            SteamCmd::Add { games, restart } => cmd::steam::add(paths, ui, games, restart),
+            SteamCmd::Remove { games, restart } => cmd::steam::remove(paths, ui, games, restart),
+            SteamCmd::Status => cmd::steam::status(paths, ui),
         },
         Cmd::Itself { command } => match command {
             SelfAction::Check => cmd::itself::check(ui),

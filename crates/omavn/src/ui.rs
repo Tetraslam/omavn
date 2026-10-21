@@ -115,6 +115,18 @@ impl Ui {
         Ok(matches!(answer.trim(), "y" | "Y" | "yes"))
     }
 
+    /// Like [`Ui::confirm`], but Enter means yes.
+    pub fn confirm_default_yes(&self, question: &str) -> anyhow::Result<bool> {
+        if self.json || !std::io::stdin().is_terminal() {
+            return Ok(true);
+        }
+        eprint!("{question} [Y/n] ");
+        std::io::stderr().flush()?;
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        Ok(!matches!(answer.trim(), "n" | "N" | "no"))
+    }
+
     pub fn finish_progress(&self) {
         if let Some(bar) = self.bar.lock().unwrap().take() {
             bar.finish_and_clear();

@@ -19,7 +19,7 @@ pub fn meta(paths: &Paths, ui: &Ui, args: MetaArgs) -> Result<ExitCode> {
     };
     for g in &mut games {
         (ui as &dyn omavn_core::Reporter).step(g.title.clone());
-        omavn_core::meta::refresh(paths, g, vndb.as_deref(), ui)?;
+        omavn_core::meta::refresh(paths, g, vndb.as_deref(), vndb.is_some(), ui)?;
     }
     ui.finish_progress();
     ui.result(&games, || {
@@ -109,15 +109,33 @@ pub fn winetricks(paths: &Paths, ui: &Ui, args: WinetricksArgs) -> Result<ExitCo
 }
 
 pub fn saves(paths: &Paths, ui: &Ui, args: SavesArgs) -> Result<ExitCode> {
-    let SavesArgs { game, open, import } = args;
-    let game = library::find(paths, &game)?;
+    let SavesArgs {
+        game,
+        open,
+        import,
+        dry_run,
+    } = args;
+    let game = game.map(|g| library::find(paths, &g)).transpose()?;
     if let Some(src) = import {
-        let dest = omavn_core::saves::import(paths, &game, &src)?;
-        ui.result(&serde_json::json!({ "imported": dest }), || {
-            ui.success(&format!("copied saves to {}", pretty(&dest)))
-        });
-        return Ok(ExitCode::SUCCESS);
+        // A single save folder for a named game: copy it as-is.
+        if let Some(g) = &game
+            && !looks_like_windows(&src)
+        {
+            let dest = omavn_core::saves::import(paths, g, &src)?;
+            ui.result(&serde_json::json!({ "imported": dest }), || {
+                ui.success(&format!("copied saves to {}", pretty(&dest)))
+            });
+            return Ok(ExitCode::SUCCESS);
+        }
+        let games = match game {
+            Some(g) => vec![g],
+            None => library::list(paths)?,
+        };
+        return import_from_windows(paths, ui, &games, &src, dry_run);
     }
+    let Some(game) = game else {
+        bail!("which game?")
+    };
     let dirs = omavn_core::saves::find(paths, &game);
     if open && let Some(d) = dirs.first() {
         open_url(&d.display().to_string());
@@ -128,6 +146,66 @@ pub fn saves(paths: &Paths, ui: &Ui, args: SavesArgs) -> Result<ExitCode> {
         }
         for d in &dirs {
             ui.line(&pretty(d));
+        }
+    });
+    Ok(ExitCode::SUCCESS)
+}
+
+/// A drive, a `Users` folder, or a user profile (rather than one game's
+/// save folder).
+fn looks_like_windows(p: &std::path::Path) -> bool {
+    let has = |name: &str| {
+        std::fs::read_dir(p).is_ok_and(|rd| {
+            rd.flatten()
+                .any(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        })
+    };
+    has("Users")
+        || has("AppData")
+        || has("Documents")
+        || p.file_name()
+            .is_some_and(|n| n.eq_ignore_ascii_case("users"))
+}
+
+fn import_from_windows(
+    paths: &Paths,
+    ui: &Ui,
+    games: &[Game],
+    src: &std::path::Path,
+    dry_run: bool,
+) -> Result<ExitCode> {
+    let found = omavn_core::migrate::scan(paths, games, src)?;
+    let mut copied = Vec::new();
+    if !dry_run {
+        for f in &found {
+            let g = games
+                .iter()
+                .find(|g| g.id == f.game)
+                .expect("scan only returns given games");
+            let backup = omavn_core::migrate::copy(paths, g, f)?;
+            copied.push(
+                serde_json::json!({ "game": f.game, "from": f.from, "to": f.to, "backup": backup }),
+            );
+        }
+    }
+    let missing: Vec<&Game> = games
+        .iter()
+        .filter(|g| !found.iter().any(|f| f.game == g.id))
+        .collect();
+    let report = serde_json::json!({ "found": found, "copied": copied, "dry_run": dry_run });
+    ui.result(&report, || {
+        for f in &found {
+            let verb = if dry_run { "would copy" } else { "copied" };
+            ui.success(&format!("{}: {verb} {} files", f.game, f.files));
+            ui.line(&ui.dim(&format!("    from {}  ({})", f.from.display(), f.why)));
+            ui.line(&ui.dim(&format!("    to   {}", pretty(&f.to))));
+        }
+        if !missing.is_empty() {
+            let ids: Vec<&str> = missing.iter().map(|g| g.id.as_str()).collect();
+            ui.line(&format!("no saves found for: {}", ids.join(", ")));
+            ui.line(&ui.dim(
+                "  if you know where one keeps them: omavn saves <game> --import <that folder>",
+            ));
         }
     });
     Ok(ExitCode::SUCCESS)

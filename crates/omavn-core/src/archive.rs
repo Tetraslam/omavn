@@ -325,8 +325,9 @@ fn extract_zip(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result
             if let Some(parent) = out.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let mut file =
-                File::create(&out).with_context(|| format!("creating {}", out.display()))?;
+            let mut file = Uncached::new(
+                File::create(&out).with_context(|| format!("creating {}", out.display()))?,
+            );
             let mut buf = vec![0u8; 1 << 20];
             loop {
                 let n = entry.read(&mut buf)?;
@@ -337,6 +338,7 @@ fn extract_zip(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result
                 let d = done.fetch_add(n as u64, Ordering::Relaxed) + n as u64;
                 reporter.progress(d, total);
             }
+            file.finish()?;
             #[cfg(unix)]
             if let Some(mode) = entry.unix_mode() {
                 use std::os::unix::fs::PermissionsExt;
@@ -373,6 +375,10 @@ fn extract_rar(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result
                     fs::create_dir_all(parent)?;
                 }
                 let next = header.extract_to(&out)?;
+                drop_cache(&out, true);
+                for vol in &set.volumes {
+                    drop_cache(vol, false);
+                }
                 done += size;
                 reporter.progress(done, total);
                 next
@@ -406,8 +412,9 @@ fn extract_7z(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result<
         if let Some(parent) = out.parent() {
             fs::create_dir_all(parent)?;
         }
-        let mut file = File::create(&out)?;
+        let mut file = Uncached::new(File::create(&out)?);
         done += io::copy(reader, &mut file)?;
+        file.finish()?;
         reporter.progress(done.min(total), total);
         Ok(true)
     })?;
@@ -436,6 +443,14 @@ fn extract_iso(set: &ArchiveSet, dest: &Path, reporter: &dyn Reporter) -> Result
             let _ = fs::set_permissions(entry.path(), fs::Permissions::from_mode(mode));
         }
     }
+    for entry in walkdir::WalkDir::new(dest).into_iter().flatten() {
+        if entry.file_type().is_file() {
+            drop_cache(entry.path(), true);
+        }
+    }
+    for vol in &set.volumes {
+        drop_cache(vol, false);
+    }
     Ok(set.total_size())
 }
 
@@ -448,6 +463,92 @@ pub fn is_junk(rel: &Path) -> bool {
             || s.starts_with("._")
             || s.eq_ignore_ascii_case("thumbs.db")
     })
+}
+
+/// Unpacking tens of gigabytes would otherwise fill RAM with page cache
+/// (both the archive read and the files written), and on a desktop that
+/// memory pressure gets the user's apps killed by systemd-oomd. Written
+/// data is flushed and dropped from cache every few megabytes.
+struct Uncached {
+    file: File,
+    written: u64,
+    flushed: u64,
+}
+
+const FLUSH_EVERY: u64 = 32 << 20;
+
+impl Uncached {
+    fn new(file: File) -> Self {
+        Self {
+            file,
+            written: 0,
+            flushed: 0,
+        }
+    }
+
+    fn flush_range(&mut self) {
+        use std::os::fd::AsRawFd;
+        let len = self.written - self.flushed;
+        if len == 0 {
+            return;
+        }
+        // SAFETY: plain syscalls on a file descriptor we own.
+        unsafe {
+            libc::sync_file_range(
+                self.file.as_raw_fd(),
+                self.flushed as i64,
+                len as i64,
+                libc::SYNC_FILE_RANGE_WAIT_BEFORE
+                    | libc::SYNC_FILE_RANGE_WRITE
+                    | libc::SYNC_FILE_RANGE_WAIT_AFTER,
+            );
+        }
+        advise_dontneed(&self.file, self.flushed, len);
+        self.flushed = self.written;
+    }
+
+    fn finish(mut self) -> io::Result<()> {
+        self.flush_range();
+        Ok(())
+    }
+}
+
+impl Write for Uncached {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.file.write(buf)?;
+        self.written += n as u64;
+        if self.written - self.flushed >= FLUSH_EVERY {
+            self.flush_range();
+        }
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
+}
+
+fn advise_dontneed(file: &File, offset: u64, len: u64) {
+    use std::os::fd::AsRawFd;
+    // SAFETY: advisory syscall on a file descriptor we own.
+    unsafe {
+        libc::posix_fadvise(
+            file.as_raw_fd(),
+            offset as i64,
+            len as i64,
+            libc::POSIX_FADV_DONTNEED,
+        );
+    }
+}
+
+/// Drop a whole file from the page cache, writing it out first when it
+/// was just written (for files another library wrote, like unrar's).
+pub fn drop_cache(path: &Path, written: bool) {
+    let Ok(f) = File::open(path) else { return };
+    if written {
+        let _ = f.sync_data();
+    }
+    advise_dontneed(&f, 0, 0);
 }
 
 /// One or more files read back to back as a single stream. Reads are
@@ -489,7 +590,11 @@ impl Volumes {
             return Ok(0);
         };
         let max = ((*start + *len - pos) as usize).min(buf.len());
-        f.read_at(&mut buf[..max], pos - *start)
+        let n = f.read_at(&mut buf[..max], pos - *start)?;
+        // Archives are read once; keeping them cached only evicts the
+        // user's own working set.
+        advise_dontneed(f, pos - *start, n as u64);
+        Ok(n)
     }
 }
 

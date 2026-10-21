@@ -8,6 +8,7 @@
 
 pub mod archive;
 pub mod art;
+pub mod batch;
 pub mod catalog;
 pub mod desktop;
 pub mod detect;
@@ -18,11 +19,14 @@ pub mod install;
 pub mod launch;
 pub mod library;
 pub mod meta;
+pub mod migrate;
 pub mod omarchy;
+pub mod patch;
 pub mod paths;
 pub mod report;
 pub mod runtime;
 pub mod saves;
+pub mod steam;
 pub mod update;
 pub mod vndb;
 

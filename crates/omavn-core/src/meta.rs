@@ -19,6 +19,7 @@ pub fn refresh(
     paths: &Paths,
     game: &mut Game,
     vndb_id: Option<&str>,
+    adopt_title: bool,
     reporter: &dyn Reporter,
 ) -> Result<()> {
     let id = vndb_id.map(String::from).or_else(|| game.vndb.clone());
@@ -30,6 +31,18 @@ pub fn refresh(
         Ok(Some(meta)) => {
             reporter.info(format!("VNDB: {} ({})", meta.title, meta.id));
             game.vndb = Some(meta.id.clone());
+            game.developers = meta.developers.clone();
+            // A title omavn guessed from file names gives way to the real one.
+            if adopt_title {
+                let real = meta
+                    .english_title
+                    .clone()
+                    .unwrap_or_else(|| meta.title.clone());
+                if !real.is_empty() && real != game.title {
+                    art::unlink(paths, game);
+                    game.title = real;
+                }
+            }
             if game.original_title.is_none() {
                 game.original_title = meta.original_title.clone();
             }

@@ -22,6 +22,8 @@ use crate::runtime;
 #[derive(Debug, Clone, Default)]
 pub struct Options {
     pub source: PathBuf,
+    /// Further files of the same download (other volumes, data files).
+    pub extra: Vec<PathBuf>,
     pub id: Option<String>,
     pub title: Option<String>,
     /// Force Proton even when a native runner is available.
@@ -32,7 +34,9 @@ pub struct Options {
 
 pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result<Game> {
     reporter.step(format!("reading {}", crate::paths::pretty(&opts.source)));
-    let staged = ingest::unwrap(&opts.source, &paths.staging(), reporter)?;
+    let mut sources = vec![opts.source.clone()];
+    sources.extend(opts.extra.iter().cloned());
+    let staged = ingest::unwrap_all(&sources, &paths.staging(), reporter)?;
     let payload = detect::classify(&staged.root())?;
 
     let source_name = opts
@@ -41,13 +45,24 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "game".into());
 
+    let mut found: Option<crate::vndb::Meta> = None;
     let (id, files_rel) = match &payload {
         Payload::Game { root, engine } => {
             let entry = catalog::lookup(paths, root)?;
+            // Look the game up now, so its id comes from its real name.
+            if entry.is_none() && opts.id.is_none() && opts.title.is_none() && !opts.offline {
+                let guess = detect::guess_title(root, *engine, &source_name);
+                found = crate::vndb::search(&guess).ok().flatten();
+            }
+            let vndb_id = found
+                .as_ref()
+                .map(|m| detect::slug(m.english_title.as_deref().unwrap_or(&m.title)))
+                .filter(|s| s.is_ascii() && s != "game");
             let base = opts
                 .id
                 .clone()
                 .or(entry.map(|e| e.id))
+                .or(vndb_id)
                 .unwrap_or_else(|| detect::guess_id(root, *engine, &source_name));
             let id = library::free_id(paths, &base);
             reporter.step(format!(
@@ -68,7 +83,7 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
     };
     drop(staged);
 
-    match finish(paths, opts, &id, files_rel, reporter) {
+    match finish(paths, opts, &id, files_rel, found, reporter) {
         Ok(game) => Ok(game),
         Err(e) => {
             reporter.warn(format!(
@@ -86,6 +101,7 @@ fn finish(
     opts: &Options,
     id: &str,
     files_rel: PathBuf,
+    found: Option<crate::vndb::Meta>,
     reporter: &dyn Reporter,
 ) -> Result<Game> {
     let dir = paths.game(id);
@@ -146,13 +162,20 @@ fn finish(
         .title
         .clone()
         .or(entry.as_ref().map(|e| e.title.clone()))
+        .or(found
+            .as_ref()
+            .map(|m| m.english_title.clone().unwrap_or_else(|| m.title.clone())))
         .unwrap_or_else(|| detect::guess_title(&files, engine, id));
 
     let mut game = Game {
         id: id.to_string(),
         title,
         original_title: None,
-        vndb: entry.as_ref().and_then(|e| e.vndb.clone()),
+        developers: Vec::new(),
+        vndb: entry
+            .as_ref()
+            .and_then(|e| e.vndb.clone())
+            .or(found.as_ref().map(|m| m.id.clone())),
         engine: entry.as_ref().and_then(|e| e.engine).unwrap_or(engine),
         runner,
         display: Display::Auto,
@@ -197,7 +220,13 @@ fn finish(
     }
     if !opts.offline {
         reporter.step("fetching metadata and art");
-        if let Err(e) = crate::meta::refresh(paths, &mut game, None, reporter) {
+        if let Err(e) = crate::meta::refresh(
+            paths,
+            &mut game,
+            None,
+            opts.title.is_none() && entry.is_none() && found.is_none(),
+            reporter,
+        ) {
             reporter.warn(format!("skipped art: {e}"));
         }
     }
@@ -276,7 +305,14 @@ fn run_installer(
         ));
     }
     let started = time::OffsetDateTime::now_utc().unix_timestamp();
-    let mut child = spec.command().spawn().context("starting umu-run")?;
+    // Proton's chatter goes to a log, not the user's terminal.
+    let log = fs::File::create(dir.join("install.log"))?;
+    let mut child = spec
+        .command()
+        .stdout(log.try_clone()?)
+        .stderr(log)
+        .spawn()
+        .context("starting umu-run")?;
     let status = loop {
         if let Some(status) = child.try_wait()? {
             break status;

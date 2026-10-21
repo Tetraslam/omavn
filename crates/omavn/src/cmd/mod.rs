@@ -11,6 +11,7 @@ pub mod manage;
 pub mod omarchy;
 pub mod play;
 pub mod runtime;
+pub mod steam;
 
 use std::io::IsTerminal;
 use std::process::{ExitCode, ExitStatus};

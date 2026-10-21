@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 use walkdir::WalkDir;
 
+use crate::archive;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum InstallerKind {
@@ -103,6 +105,23 @@ pub fn classify(dir: &Path) -> Result<Payload> {
 
     if engine != Engine::Unknown {
         return Ok(Payload::Game { root, engine });
+    }
+    // Disc-style releases: a setup.exe (and autorun.inf, readmes) next to
+    // the finished game folder, which the installer would only copy.
+    let subgames: Vec<(PathBuf, Engine)> = list(&root)
+        .into_iter()
+        .filter(|p| p.is_dir() && !archive::is_junk(Path::new(&lower_name(p))))
+        .map(|d| {
+            let e = self::engine(&d);
+            (d, e)
+        })
+        .filter(|(_, e)| *e != Engine::Unknown)
+        .collect();
+    if let [(sub, engine)] = subgames.as_slice() {
+        return Ok(Payload::Game {
+            root: sub.clone(),
+            engine: *engine,
+        });
     }
 
     let top_level: Vec<&PathBuf> = exes
@@ -309,11 +328,30 @@ fn trim_slug(slug: &str) -> String {
         "win", "w", "windows", "win32", "win64", "x64", "x86", "pc", "final", "freem", "full",
         "ver", "v",
     ];
+    // Words that describe the download, wherever they appear.
+    const PACKAGING: &[&str] = &[
+        "setup",
+        "installer",
+        "install",
+        "r18",
+        "unrated",
+        "release",
+        "dl",
+        "complete",
+    ];
     let mut parts: Vec<&str> = slug.split('-').collect();
+    if parts.iter().any(|p| !PACKAGING.contains(p)) {
+        parts.retain(|p| !PACKAGING.contains(p));
+    }
     while parts.len() > 1 {
         let last = parts[parts.len() - 1];
         let version = last.trim_start_matches("ver").trim_start_matches('v');
+        // `1-0-2en`: a version number with a language tag glued on.
+        let lang_version = last.len() > 2
+            && ["en", "jp", "cn", "tw"].iter().any(|l| last.ends_with(l))
+            && last[..last.len() - 2].bytes().all(|b| b.is_ascii_digit());
         if NOISE.contains(&last)
+            || lang_version
             || (!version.is_empty() && version.bytes().all(|b| b.is_ascii_digit()))
         {
             parts.pop();
@@ -357,9 +395,27 @@ pub fn guess_title(root: &Path, engine: Engine, fallback: &str) -> String {
         .map(|t| t.name)
         .filter(|n| !GENERIC.contains(&slug(n).as_str()));
     renpy_name
+        .or_else(|| inno_app_name(root))
         .or(product)
         .or(stem)
         .unwrap_or_else(|| fallback.replace(['-', '_'], " "))
+}
+
+/// The app name Inno Setup recorded in its uninstall log, for games that
+/// came from an Inno installer.
+fn inno_app_name(root: &Path) -> Option<String> {
+    let mut head = [0u8; 320];
+    File::open(root.join("unins000.dat"))
+        .ok()?
+        .read_exact(&mut head)
+        .ok()?;
+    if !head.starts_with(b"Inno Setup Uninstall Log") {
+        return None;
+    }
+    let field = &head[192..320];
+    let end = field.iter().position(|b| *b == 0).unwrap_or(field.len());
+    let name = String::from_utf8_lossy(&field[..end]).trim().to_string();
+    (!name.is_empty()).then_some(name)
 }
 
 /// `ProductName` from an exe's version resource, unless it just names the engine.
@@ -534,6 +590,21 @@ fn score(root: &Path, exe: &Path, engine: Engine) -> i64 {
     if SIDEKICKS.iter().any(|k| stem.contains(k)) {
         s -= 30;
     }
+    // Engine binaries behind a named launcher (`engine.exe` next to
+    // `Dracu-Riot!.exe`) start the same game but name nothing.
+    const GENERIC_EXES: &[&str] = &[
+        "engine",
+        "engine32",
+        "engine64",
+        "game",
+        "app",
+        "main",
+        "nw",
+        "bootstrap",
+    ];
+    if GENERIC_EXES.contains(&stem) {
+        s -= 40;
+    }
     let dir = lower_name(root);
     if !stem.is_empty() && (dir.contains(stem) || stem.contains(&dir)) {
         s += 15;
@@ -638,6 +709,9 @@ mod tests {
         );
         assert_eq!(trim_slug("4gatsu-8ka-ver2-0-0-4"), "4gatsu-8ka");
         assert_eq!(trim_slug("dies-irae"), "dies-irae");
+        assert_eq!(trim_slug("gss-setup-1-0-2en"), "gss");
+        assert_eq!(trim_slug("senrenbanka-r18"), "senrenbanka");
+        assert_eq!(trim_slug("muramasa-installer-1-04"), "muramasa");
     }
 
     #[test]
