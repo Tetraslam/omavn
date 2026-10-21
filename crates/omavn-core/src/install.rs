@@ -51,8 +51,23 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
             let entry = catalog::lookup(paths, root)?;
             // Look the game up now, so its id comes from its real name.
             if entry.is_none() && opts.id.is_none() && opts.title.is_none() && !opts.offline {
-                let guess = detect::guess_title(root, *engine, &source_name);
-                found = crate::vndb::search(&guess).ok().flatten();
+                // The game's own metadata first, then the download's name.
+                let mut tries = vec![
+                    detect::guess_title(root, *engine, &source_name),
+                    detect::clean_name(&source_name),
+                    detect::clean_name(
+                        &root
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default(),
+                    ),
+                ];
+                tries.retain(|t| t != "files");
+                tries.dedup();
+                found = tries
+                    .iter()
+                    .filter(|t| !t.is_empty())
+                    .find_map(|t| crate::vndb::search(t).ok().flatten());
             }
             let vndb_id = found
                 .as_ref()

@@ -112,3 +112,17 @@ fn disc_images_unwrap() {
     drop(staged);
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn a_bare_installer_download() {
+    let dir = scratch("bare");
+    let exe = dir.join("muramasa_installer_1.04.exe");
+    fs::write(&exe, b"MZ ... Setup Factory ...").unwrap();
+    let staged = ingest::unwrap(&exe, &dir.join("staging"), &Silent).unwrap();
+    match detect::classify(&staged.root()).unwrap() {
+        Payload::Installer { exe, .. } => assert!(exe.ends_with("muramasa_installer_1.04.exe")),
+        other => panic!("expected an installer, got {other:?}"),
+    }
+    drop(staged);
+    fs::remove_dir_all(dir).unwrap();
+}

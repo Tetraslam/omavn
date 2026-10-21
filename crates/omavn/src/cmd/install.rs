@@ -152,6 +152,14 @@ fn show_plan(paths: &Paths, ui: &Ui, units: &[Unit]) {
                     )),
                 }
             }
+            Role::Included { base } => ui.line(&format!(
+                "  - {}  {}",
+                u.name,
+                ui.dim(&format!(
+                    "{} already has this version; skipped",
+                    units[*base].name
+                ))
+            )),
             Role::Duplicate { of } => ui.line(&format!(
                 "  - {}  {}",
                 u.name,
@@ -239,6 +247,15 @@ fn run_batch(
                 .into_iter()
                 .find(|g| batch::patch_fits(&u.files, g))
                 .map(|g| g.id),
+            Role::Included { .. } => {
+                outcomes.push(Outcome {
+                    download: u.name.clone(),
+                    id: None,
+                    status: "skipped (already included)",
+                    error: None,
+                });
+                continue;
+            }
             Role::Duplicate { .. } => {
                 outcomes.push(Outcome {
                     download: u.name.clone(),

@@ -120,6 +120,7 @@ fn run_patcher(
         reporter,
     )?;
     let log = fs::File::create(game.dir(paths).join("patch.log"))?;
+    let before = newest_change(&files);
     let status = spec
         .command()
         .stdout(log.try_clone()?)
@@ -127,6 +128,14 @@ fn run_patcher(
         .status()?;
     if !status.success() {
         reporter.warn(format!("{} exited with {status}", file_name(exe)));
+    }
+    // Patchers exit 0 when they refuse too ("game not found", "already
+    // up to date"); the files tell the truth.
+    if newest_change(&files) <= before {
+        bail!(
+            "{} finished without changing the game's files",
+            file_name(exe)
+        );
     }
     Ok(Applied::Program {
         exe: file_name(exe),
@@ -231,6 +240,16 @@ fn case_insensitive(base: &Path, rel: &Path) -> PathBuf {
         cur.push(existing.unwrap_or_else(|| comp.as_os_str().to_owned()));
     }
     cur
+}
+
+/// Latest modification time of any file under `dir`.
+fn newest_change(dir: &Path) -> Option<std::time::SystemTime> {
+    WalkDir::new(dir)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| e.metadata().ok()?.modified().ok())
+        .max()
 }
 
 fn is_doc(name: &str) -> bool {

@@ -23,6 +23,10 @@ pub enum Role {
     Duplicate {
         of: usize,
     },
+    /// A patch to a version the game's download already has.
+    Included {
+        base: usize,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -173,7 +177,11 @@ pub fn plan(paths: &[PathBuf]) -> Vec<Unit> {
         let base = (0..units.len()).find(|&j| {
             units[j].role == Role::Game && !ids[j].is_empty() && ids[j].is_subset(&ids[i])
         });
-        units[i].role = Role::Patch { base };
+        let ver = |k: usize| version(&units[k].files[0]);
+        units[i].role = match base {
+            Some(b) if ver(i).is_some_and(|v| Some(v) <= ver(b)) => Role::Included { base: b },
+            _ => Role::Patch { base },
+        };
     }
     units
 }
@@ -214,6 +222,31 @@ fn worse(a: &Unit, b: &Unit) -> bool {
         (false, true) => false,
         _ => (a.size, &a.files[0]) < (b.size, &b.files[0]),
     }
+}
+
+/// The version in a file name: `muramasa_patch_1.04.exe` -> [1, 4].
+fn version(path: &Path) -> Option<Vec<u32>> {
+    // The last dotted run of numbers, ignoring the file extension.
+    let name = file_name(path).to_lowercase();
+    let mut best = None;
+    for (i, c) in name.char_indices() {
+        if !c.is_ascii_digit() || name[..i].ends_with(|p: char| p.is_ascii_digit() || p == '.') {
+            continue;
+        }
+        let run: String = name[i..]
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        let parts: Vec<u32> = run
+            .split('.')
+            .filter(|p| !p.is_empty())
+            .filter_map(|p| p.parse().ok())
+            .collect();
+        if parts.len() >= 2 {
+            best = Some(parts);
+        }
+    }
+    best
 }
 
 fn is_patch(files: &[PathBuf]) -> bool {
@@ -379,6 +412,14 @@ mod tests {
     }
 
     #[test]
+    fn versions() {
+        let v = |s: &str| version(Path::new(s));
+        assert_eq!(v("muramasa_patch_1.04.exe"), Some(vec![1, 4]));
+        assert_eq!(v("Angelic Chaos update v1.13a.zip"), Some(vec![1, 13]));
+        assert_eq!(v("Saya_no_Uta.zip"), None);
+    }
+
+    #[test]
     fn identities() {
         let id = |s: &str| {
             identity(Path::new(s))
@@ -434,7 +475,7 @@ mod tests {
         let mura = by("muramasa installer");
         assert_eq!(
             units[by("muramasa patch")].role,
-            Role::Patch { base: Some(mura) }
+            Role::Included { base: mura }
         );
         assert_eq!(
             units[by("Saya no Uta old")].role,

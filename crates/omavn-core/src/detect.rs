@@ -326,7 +326,7 @@ const GENERIC: &[&str] = &[
 fn trim_slug(slug: &str) -> String {
     const NOISE: &[&str] = &[
         "win", "w", "windows", "win32", "win64", "x64", "x86", "pc", "final", "freem", "full",
-        "ver", "v",
+        "ver", "v", "en", "eng", "english",
     ];
     // Words that describe the download, wherever they appear.
     const PACKAGING: &[&str] = &[
@@ -335,6 +335,7 @@ fn trim_slug(slug: &str) -> String {
         "install",
         "r18",
         "unrated",
+        "version",
         "release",
         "dl",
         "complete",
@@ -380,6 +381,27 @@ pub fn guess_id(root: &Path, engine: Engine, download: &str) -> String {
         .or_else(|| slugs.iter().find(|s| !GENERIC.contains(&s.as_str())))
         .cloned()
         .unwrap_or_else(|| "game".into())
+}
+
+/// The words of a download's file name, minus packaging noise and version
+/// numbers, in order: `eden-of-grisaia-unrated` -> `eden of grisaia`.
+pub fn clean_name(download: &str) -> String {
+    let mut name = download.to_lowercase();
+    loop {
+        let before = name.len();
+        for ext in [
+            ".zip", ".7z", ".rar", ".exe", ".iso", ".001", ".002", ".part1",
+        ] {
+            if let Some(s) = name.strip_suffix(ext) {
+                name = s.to_string();
+            }
+        }
+        if name.len() == before {
+            break;
+        }
+    }
+    let slugged = trim_slug(&slug(&name));
+    slugged.replace('-', " ")
 }
 
 /// A display title for a game without a catalog entry or VNDB match:
@@ -441,6 +463,7 @@ fn product_name(exe: &Path) -> Option<String> {
         "tyrano",
         "rpg maker",
         "microsoft",
+        "cmvs",
     ];
     let lower = name.to_lowercase();
     (!name.is_empty() && !ENGINES.iter().any(|e| lower.contains(e))).then_some(name)
@@ -480,6 +503,8 @@ pub fn installer_kind(exe: &Path) -> Option<InstallerKind> {
 /// Every `.exe` under `root`, a few levels deep, sorted.
 pub fn executables(root: &Path) -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = WalkDir::new(root)
+        // Staging links to the user's files instead of copying them.
+        .follow_links(true)
         .max_depth(4)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -517,7 +542,7 @@ pub fn is_helper(exe: &Path) -> bool {
         "setup",
         "install",
     ];
-    if PREFIXES.iter().any(|p| stem.starts_with(p)) {
+    if PREFIXES.iter().any(|p| stem.starts_with(p)) || stem.contains("updater") {
         return true;
     }
     // Ren'Py's bundled interpreter lives in lib/, never the entry point.
@@ -585,7 +610,7 @@ fn score(root: &Path, exe: &Path, engine: Engine) -> i64 {
         s += 100;
     }
     const SIDEKICKS: &[&str] = &[
-        "config", "setting", "launcher", "update", "patch", "readme", "manual", "tool",
+        "config", "setting", "launcher", "update", "patch", "readme", "manual", "tool", "bootmenu",
     ];
     if SIDEKICKS.iter().any(|k| stem.contains(k)) {
         s -= 30;
@@ -698,6 +723,15 @@ mod tests {
         assert!(is_32bit_exe(&dir.join("x86.exe")));
         assert!(!is_32bit_exe(&dir.join("x64.exe")));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn clean_names() {
+        assert_eq!(clean_name("eden-of-grisaia-unrated.7z"), "eden of grisaia");
+        assert_eq!(clean_name("Dracu Riot R18 v1.0 Release"), "dracu riot");
+        assert_eq!(clean_name("Majikoi_Installer"), "majikoi");
+        assert_eq!(clean_name("hapymaher_en"), "hapymaher");
+        assert_eq!(clean_name("RiddleJokerR18_1.00"), "riddlejokerr18");
     }
 
     #[test]
