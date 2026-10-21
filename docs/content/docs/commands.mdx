@@ -14,7 +14,14 @@ omavn install <download> [--id ID] [--title TITLE] [--proton] [--offline]
 omavn install --pick
 ```
 
-Unpacks, installs, and registers a game, then fetches its VNDB metadata and art. `<download>` can be a file or a folder. Alias: `add`.
+Unpacks, installs, and registers a game, then fetches its VNDB metadata and art.
+
+Give it several downloads, or a folder of many (a drive full of VNs), and it plans first: split archives go with their parts, installers with their data files, patches with the game they patch, and older copies of the same game are skipped. It shows the plan, asks once, installs everything in a row, and ends with a summary.
+
+```bash
+omavn install /mnt/usb --dry-run   # just show the plan
+omavn install /mnt/usb --yes       # no question
+``` `<download>` can be a file or a folder. Alias: `add`.
 
 - `--id` sets the library id (default: from the catalog or the folder name)
 - `--proton` runs a Ren'Py game through Proton instead of natively
@@ -91,6 +98,14 @@ omavn remove --pick             # pick from an Omarchy menu
 
 Deletes the game, its prefix, its saves (see `omavn saves` first), and its launcher entry. Asks first unless you pass `--yes`. Alias: `rm`.
 
+## patch
+
+```bash
+omavn patch <game> ~/Downloads/update-v1.13a.zip
+```
+
+Applies an update. Loose files are copied into the right folder of the game (what they replace is saved in the game's `backup/`); patcher programs run inside the game's prefix.
+
 ## saves
 
 ```bash
@@ -101,7 +116,13 @@ omavn saves <game> --import /mnt/windows/Users/me/AppData/Roaming/light
 
 Finds save data by what changed after install: the Wine prefix's AppData and Documents, `save` folders in the game, and `~/.renpy` for native Ren'Py games. Back these up before `omavn remove`.
 
-Coming from Windows? `--import` copies a save folder from your old Windows install (mounted drive, backup, USB stick) into the same place inside the game's prefix: everything after `Users/<name>/` is kept, so `AppData/Roaming/light` lands where Dies irae looks for it. Games' readmes usually say where their saves live.
+Moving a whole library? Point `--import` at the Windows drive (or a copy of your user folder) without naming a game, and omavn finds every installed game's saves: AppData and Documents folders named after the game or its developer, Ren'Py's save folders, and `savedata` folders next to old installs. Anything already in place is backed up first. Add `--dry-run` to see the matches.
+
+```bash
+omavn saves --import /mnt/windows --dry-run
+```
+
+For one game: `--import` copies a save folder from your old Windows install (mounted drive, backup, USB stick) into the same place inside the game's prefix: everything after `Users/<name>/` is kept, so `AppData/Roaming/light` lands where Dies irae looks for it. Games' readmes usually say where their saves live.
 
 ## exec
 
@@ -127,6 +148,17 @@ omavn inspect <download>
 ```
 
 Reports what omavn would do (game or installer, engine, entry points) without installing.
+
+## steam
+
+```bash
+omavn steam add          # every installed game
+omavn steam add dies     # just one
+omavn steam remove
+omavn steam status
+```
+
+Adds games to Steam as non-Steam games, with cover, banner, and hero art, under a Visual Novels collection, so they work in Big Picture, on a Steam Deck, and with controllers. Steam rewrites its shortcut file when it exits, so close it first or pass `--restart`.
 
 ## omarchy
 
