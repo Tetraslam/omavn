@@ -51,23 +51,7 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
             let entry = catalog::lookup(paths, root)?;
             // Look the game up now, so its id comes from its real name.
             if entry.is_none() && opts.id.is_none() && opts.title.is_none() && !opts.offline {
-                // The game's own metadata first, then the download's name.
-                let mut tries = vec![
-                    detect::guess_title(root, *engine, &source_name),
-                    detect::clean_name(&source_name),
-                    detect::clean_name(
-                        &root
-                            .file_name()
-                            .map(|n| n.to_string_lossy().into_owned())
-                            .unwrap_or_default(),
-                    ),
-                ];
-                tries.retain(|t| t != "files");
-                tries.dedup();
-                found = tries
-                    .iter()
-                    .filter(|t| !t.is_empty())
-                    .find_map(|t| crate::vndb::search(t).ok().flatten());
+                found = find_on_vndb(root, *engine, &source_name);
             }
             let vndb_id = found
                 .as_ref()
@@ -111,6 +95,25 @@ pub fn install(paths: &Paths, opts: &Options, reporter: &dyn Reporter) -> Result
     }
 }
 
+/// Search VNDB by the game's own metadata first, then the download's name,
+/// then its folder's name.
+fn find_on_vndb(root: &Path, engine: Engine, source_name: &str) -> Option<crate::vndb::Meta> {
+    let folder = root
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut tries = vec![
+        detect::guess_title(root, engine, source_name),
+        detect::clean_name(source_name),
+        detect::clean_name(&folder),
+    ];
+    tries.retain(|t| !t.is_empty() && t != "files");
+    tries.dedup();
+    tries
+        .iter()
+        .find_map(|t| crate::vndb::search(t).ok().flatten())
+}
+
 fn finish(
     paths: &Paths,
     opts: &Options,
@@ -123,6 +126,12 @@ fn finish(
     let files = dir.join(&files_rel);
     let engine = detect::engine(&files);
     let entry = catalog::lookup(paths, &files)?;
+    // Installed games are only looked up once their files exist.
+    let found = found.or_else(|| {
+        let ask = entry.is_none() && opts.title.is_none() && !opts.offline;
+        let stem = opts.source.file_stem()?.to_string_lossy().into_owned();
+        ask.then(|| find_on_vndb(&files, engine, &stem)).flatten()
+    });
 
     let mut targets = detect::targets(&files, engine);
     if let Some(e) = &entry

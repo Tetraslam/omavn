@@ -327,6 +327,7 @@ fn resource_languages(exe: &Path) -> Vec<u32> {
 
 /// Names that say nothing about the game.
 const GENERIC: &[&str] = &[
+    "bgi",
     "data",
     "game",
     "games",
@@ -486,6 +487,7 @@ fn product_name(exe: &Path) -> Option<String> {
         "rpg maker",
         "microsoft",
         "cmvs",
+        "buriko",
     ];
     let lower = name.to_lowercase();
     (!name.is_empty() && !ENGINES.iter().any(|e| lower.contains(e))).then_some(name)
@@ -557,6 +559,8 @@ pub fn is_helper(exe: &Path) -> bool {
         "crashhandler",
         "unitycrashhandler",
         "zsync",
+        // Ships next to BURIKO games, never the game itself.
+        "bhvc",
         "python",
         "notification_helper",
         "ue4prereq",

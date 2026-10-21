@@ -207,11 +207,29 @@ pub fn is_collection(dir: &Path) -> bool {
         return false;
     };
     let entries: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
+    if is_game_folder(dir, &entries) {
+        return false;
+    }
     plan(&entries)
         .iter()
         .filter(|u| u.role == Role::Game)
         .count()
         > 1
+}
+
+/// An installed game (copied off a Windows drive, say): an engine omavn
+/// knows, or an exe next to files no folder of downloads holds.
+fn is_game_folder(dir: &Path, entries: &[PathBuf]) -> bool {
+    const GAME_FILES: &[&str] = &["dll", "dat", "pak", "arc", "pck", "int", "ini", "ogg"];
+    let ext = |p: &PathBuf| {
+        p.extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default()
+    };
+    let files = || entries.iter().filter(|p| p.is_file());
+    crate::detect::engine(dir) != crate::detect::Engine::Unknown
+        || (files().any(|p| ext(p) == "exe")
+            && files().any(|p| GAME_FILES.contains(&ext(p).as_str())))
 }
 
 /// Loser of two copies of the same game.
@@ -409,6 +427,24 @@ mod tests {
         assert_eq!(k("setup-1.bin"), "setup");
         assert_eq!(k("Dies Irae.part2.rar"), "dies irae");
         assert_eq!(k("MG1064.zip"), "mg1064");
+    }
+
+    #[test]
+    fn game_folders_are_not_collections() {
+        let dir = std::env::temp_dir().join(format!("omavn-coll-{}", std::process::id()));
+        let game = dir.join("Majikoi");
+        let downloads = dir.join("downloads");
+        fs::create_dir_all(&game).unwrap();
+        fs::create_dir_all(&downloads).unwrap();
+        for f in ["majikoi.exe", "config.exe", "data.pak", "d3dx9_43.dll"] {
+            fs::write(game.join(f), b"x").unwrap();
+        }
+        for f in ["Kinkoi Installer.zip", "SabbatOfTheWitch.zip"] {
+            fs::write(downloads.join(f), b"PK\x03\x04").unwrap();
+        }
+        assert!(!is_collection(&game));
+        assert!(is_collection(&downloads));
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
